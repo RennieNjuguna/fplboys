@@ -1,0 +1,170 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block title %}{{ member.manager_name }} - Manager Profile - FPL Boys{% endblock %}
+
+{% block content %}
+<div class="space-y-5 sm:space-y-6">
+
+    <!-- Manager Header Profile Card -->
+    <div class="bg-gradient-to-r from-purple-950 via-gray-900 to-gray-900 border border-purple-800/60 rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-xl relative overflow-hidden">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 sm:gap-6">
+            <div class="flex items-center space-x-3.5 sm:space-x-4">
+                <div class="w-13 h-13 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-tr from-fpl-green to-fpl-cyan flex items-center justify-center text-black font-black text-xl sm:text-2xl shadow-lg flex-shrink-0">
+                    {{ member.manager_name|slice:":1" }}
+                </div>
+                <div class="min-w-0">
+                    <h1 class="text-xl sm:text-3xl font-black text-white truncate">{{ member.manager_name }}</h1>
+                    <p class="text-xs sm:text-sm font-semibold text-fpl-green mt-0.5 truncate">{{ member.team_name }}</p>
+                    <div class="flex flex-wrap items-center gap-2 text-[10px] sm:text-xs text-gray-400 mt-1.5 sm:mt-2">
+                        <span class="bg-gray-800 px-2 py-0.5 rounded border border-gray-700 font-mono">FPL ID: {{ member.fpl_entry_id }}</span>
+                        {% if member.phone_number %}
+                        <span class="bg-gray-800 px-2 py-0.5 rounded border border-gray-700 font-mono">M-Pesa: {{ member.phone_number }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Net Financial Tag -->
+            <div class="p-3 sm:p-4 rounded-xl sm:rounded-2xl border bg-black/40 text-left sm:text-right w-full sm:w-auto sm:min-w-[200px] {% if net_pl >= 0 %}border-emerald-500/50{% else %}border-rose-500/50{% endif %}">
+                <span class="text-[10px] sm:text-xs text-gray-400 uppercase font-bold tracking-wider">Net Profit / Loss</span>
+                <div class="text-xl sm:text-2xl font-black {% if net_pl >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %} mt-0.5">
+                    {% if net_pl > 0 %}+{% endif %}Ksh. {{ net_pl|floatformat:2 }}
+                </div>
+                <div class="text-[10px] sm:text-[11px] text-gray-400 mt-0.5">
+                    {{ total_points }} Total League Points
+                </div>
+            </div>
+        </div>
+
+        <!-- 4 KPI Badges (2x2 on Mobile) -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-4 mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-purple-900/40">
+            <div class="p-2.5 sm:p-3 bg-gray-800/50 rounded-xl border border-gray-700/50">
+                <span class="text-[10px] sm:text-[11px] text-gray-400 uppercase font-bold">Total Points</span>
+                <div class="text-lg sm:text-xl font-bold text-white mt-0.5">{{ total_points }} pts</div>
+            </div>
+            <div class="p-2.5 sm:p-3 bg-emerald-950/30 rounded-xl border border-emerald-800/40">
+                <span class="text-[10px] sm:text-[11px] text-emerald-400 uppercase font-bold">Total Prizes Won</span>
+                <div class="text-lg sm:text-xl font-bold text-emerald-300 mt-0.5">Ksh. {{ total_won|floatformat:0 }}</div>
+            </div>
+            <div class="p-2.5 sm:p-3 bg-gray-800/50 rounded-xl border border-gray-700/50">
+                <span class="text-[10px] sm:text-[11px] text-gray-400 uppercase font-bold">Paid</span>
+                <div class="text-lg sm:text-xl font-bold text-white mt-0.5">Ksh. {{ total_paid|floatformat:0 }}</div>
+            </div>
+            <div class="p-2.5 sm:p-3 bg-amber-950/30 rounded-xl border border-amber-800/40">
+                <span class="text-[10px] sm:text-[11px] text-amber-400 uppercase font-bold">Fines Incurred</span>
+                <div class="text-lg sm:text-xl font-bold text-amber-300 mt-0.5">Ksh. {{ total_fines|floatformat:0 }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2 Columns: GW Scores & Financial History -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6">
+        
+        <!-- Column 1: Gameweek Results -->
+        <div class="bg-gray-900 border border-gray-800 rounded-2xl sm:rounded-3xl shadow-xl overflow-hidden">
+            <div class="bg-gray-850 px-4 sm:px-6 py-3.5 sm:py-4 border-b border-gray-800 flex items-center justify-between">
+                <h2 class="text-xs sm:text-sm font-bold text-white flex items-center">
+                    <i data-lucide="award" class="w-4 h-4 mr-2 text-fpl-green"></i> GW Performance History
+                </h2>
+                <span class="text-[11px] sm:text-xs text-gray-400">{{ gw_results.count }} GWs</span>
+            </div>
+
+            <div class="overflow-x-auto" style="-webkit-overflow-scrolling: touch;">
+                <table class="w-full text-left text-xs sm:text-sm text-gray-300">
+                    <thead class="bg-gray-800/60 uppercase text-gray-400 font-bold border-b border-gray-800 text-[10px] sm:text-xs">
+                        <tr>
+                            <th class="px-3 sm:px-4 py-3">GW</th>
+                            <th class="px-2 sm:px-4 py-3 text-center">Gross</th>
+                            <th class="px-2 sm:px-4 py-3 text-center">Hits</th>
+                            <th class="px-2 sm:px-4 py-3 text-center font-bold text-fpl-green">Net</th>
+                            <th class="px-2 sm:px-4 py-3 text-center">Rank</th>
+                            <th class="px-3 sm:px-4 py-3 text-right">Prize</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-800 font-mono text-xs sm:text-sm">
+                        {% for r in gw_results %}
+                        <tr class="hover:bg-purple-950/20">
+                            <td class="px-3 sm:px-4 py-3 font-bold text-white">{{ r.gameweek.name }}</td>
+                            <td class="px-2 sm:px-4 py-3 text-center text-gray-300">{{ r.gw_points }}</td>
+                            <td class="px-2 sm:px-4 py-3 text-center">
+                                {% if r.transfer_cost > 0 %}
+                                <span class="text-rose-400 font-semibold">-{{ r.transfer_cost }}</span>
+                                {% else %}0{% endif %}
+                            </td>
+                            <td class="px-2 sm:px-4 py-3 text-center font-bold text-white">{{ r.net_points }}</td>
+                            <td class="px-2 sm:px-4 py-3 text-center">
+                                {% if r.league_rank == 1 %}🥇 1st
+                                {% elif r.league_rank == 2 %}🥈 2nd
+                                {% elif r.league_rank == 3 %}🥉 3rd
+                                {% else %}{{ r.league_rank }}{% endif %}
+                            </td>
+                            <td class="px-3 sm:px-4 py-3 text-right font-bold text-emerald-400">
+                                {% if r.gw_prize_won > 0 %}
+                                Ksh. {{ r.gw_prize_won|floatformat:0 }}
+                                {% else %}-{% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-center py-6 text-gray-500 font-sans text-xs">No scores recorded yet.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Column 2: Payment History -->
+        <div class="bg-gray-900 border border-gray-800 rounded-2xl sm:rounded-3xl shadow-xl overflow-hidden">
+            <div class="bg-gray-850 px-4 sm:px-6 py-3.5 sm:py-4 border-b border-gray-800 flex items-center justify-between">
+                <h2 class="text-xs sm:text-sm font-bold text-white flex items-center">
+                    <i data-lucide="receipt" class="w-4 h-4 mr-2 text-emerald-400"></i> Payment Statement
+                </h2>
+                <span class="text-[11px] sm:text-xs text-gray-400">{{ payments.count }} Payments</span>
+            </div>
+
+            <div class="overflow-x-auto" style="-webkit-overflow-scrolling: touch;">
+                <table class="w-full text-left text-xs sm:text-sm text-gray-300">
+                    <thead class="bg-gray-800/60 uppercase text-gray-400 font-bold border-b border-gray-800 text-[10px] sm:text-xs">
+                        <tr>
+                            <th class="px-3 sm:px-4 py-3">GW</th>
+                            <th class="px-3 sm:px-4 py-3">Amount</th>
+                            <th class="px-2 sm:px-4 py-3">Status</th>
+                            <th class="px-2 sm:px-4 py-3">Ref</th>
+                            <th class="px-3 sm:px-4 py-3 text-right">Date</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-800 font-mono text-xs sm:text-sm">
+                        {% for p in payments %}
+                        <tr class="hover:bg-purple-950/20">
+                            <td class="px-3 sm:px-4 py-3 font-bold text-white">GW {{ p.gameweek.number }}</td>
+                            <td class="px-3 sm:px-4 py-3 font-bold text-emerald-400">Ksh. {{ p.amount_paid|floatformat:0 }}</td>
+                            <td class="px-2 sm:px-4 py-3 font-sans">
+                                {% if p.is_late %}
+                                <span class="bg-amber-950 text-amber-400 border border-amber-800 px-1.5 py-0.5 rounded text-[10px] font-bold">
+                                    Late (+50)
+                                </span>
+                                {% else %}
+                                <span class="bg-emerald-950 text-emerald-400 border border-emerald-800 px-1.5 py-0.5 rounded text-[10px] font-bold">
+                                    On Time
+                                </span>
+                                {% endif %}
+                            </td>
+                            <td class="px-2 sm:px-4 py-3 text-gray-300">{{ p.mpesa_code|default:"-" }}</td>
+                            <td class="px-3 sm:px-4 py-3 text-right text-gray-400 text-[11px]">{{ p.timestamp_received|date:"d M H:i" }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center py-6 text-gray-500 font-sans text-xs">No payments logged yet.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+</div>
+{% endblock %}

@@ -1,0 +1,277 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block title %}Dashboard - FPL Boys{% endblock %}
+
+{% block content %}
+<div class="space-y-5 sm:space-y-6">
+
+    <!-- Top Hero Banner: League Header & Active Gameweek Status -->
+    <div class="bg-gradient-to-r from-fpl-purple via-purple-950 to-gray-900 border border-purple-800/60 rounded-2xl sm:rounded-3xl p-4 sm:p-7 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
+        <div>
+            <div class="flex items-center space-x-2">
+                <span class="bg-fpl-green text-black font-black text-[10px] sm:text-[11px] px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                    Season 2026/27
+                </span>
+                <span class="text-[11px] sm:text-xs text-purple-300 font-mono">10 Managers Mini-League</span>
+            </div>
+            <h1 class="text-xl sm:text-3xl font-black text-white tracking-tight mt-1">
+                FPL BOYS LEADERBOARD
+            </h1>
+            <p class="text-xs sm:text-sm text-gray-300 mt-0.5">
+                Official standings and financial prize tracking. Weekly contribution: <strong class="text-fpl-green">Ksh. 150/GW</strong>.
+            </p>
+        </div>
+
+        {% if current_or_next_gw %}
+        <div class="bg-black/40 backdrop-blur border border-purple-700/40 rounded-xl sm:rounded-2xl px-3.5 py-2.5 sm:px-4 sm:py-3 flex items-center space-x-3 self-stretch sm:self-start md:self-auto">
+            <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-purple-900/80 border border-purple-500/50 flex items-center justify-center text-fpl-cyan flex-shrink-0">
+                <i data-lucide="clock" class="w-4 h-4 sm:w-5 sm:h-5"></i>
+            </div>
+            <div class="min-w-0">
+                <div class="text-[10px] sm:text-[11px] font-bold text-purple-300 uppercase tracking-wider truncate">
+                    {{ current_or_next_gw.name }} Deadline
+                </div>
+                <div class="text-xs sm:text-sm font-black text-white truncate">
+                    {{ current_or_next_gw.deadline_eat|date:"D, d M @ H:i" }} EAT
+                </div>
+                <div class="text-[10px] sm:text-[11px] {% if current_or_next_gw.status == 'active' %}text-amber-400 font-bold{% elif current_or_next_gw.is_past_deadline %}text-red-400{% else %}text-emerald-400{% endif %} flex items-center mt-0.5">
+                    <span class="w-1.5 h-1.5 rounded-full {% if current_or_next_gw.status == 'active' %}bg-amber-400 animate-ping{% elif current_or_next_gw.is_past_deadline %}bg-red-400{% else %}bg-emerald-400 animate-pulse{% endif %} mr-1.5 flex-shrink-0"></span>
+                    <span class="truncate">{{ current_or_next_gw.get_status_display }}</span>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- 4 High-Impact Pot Metrics (Mobile 2x2 Grid) -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
+        
+        <!-- BBQ Pot -->
+        <div class="bg-gray-900/90 border border-amber-500/30 rounded-2xl p-3.5 sm:p-5 shadow-lg relative overflow-hidden group hover:border-amber-500/60 transition-all">
+            <div class="flex items-center justify-between">
+                <span class="text-[10px] sm:text-xs font-bold text-amber-400 uppercase tracking-wider">🍖 BBQ Pot</span>
+                <span class="text-xs sm:text-sm">🔥</span>
+            </div>
+            <div class="text-lg sm:text-3xl font-black text-white mt-1 sm:mt-2">
+                Ksh. {{ treasury.total_bbq_pot|floatformat:0|intcomma }}
+            </div>
+            <div class="text-[10px] sm:text-[11px] text-amber-300/80 mt-0.5 sm:mt-1 truncate">
+                Base: {{ treasury.bbq_standard_portion|floatformat:0 }} | <span class="text-amber-400 font-bold">+{{ treasury.bbq_fines_portion|floatformat:0 }} Fines</span>
+            </div>
+        </div>
+
+        <!-- Jackpot Pot -->
+        <div class="bg-gray-900/90 border border-purple-500/30 rounded-2xl p-3.5 sm:p-5 shadow-lg relative overflow-hidden group hover:border-purple-500/60 transition-all">
+            <div class="flex items-center justify-between">
+                <span class="text-[10px] sm:text-xs font-bold text-purple-400 uppercase tracking-wider">🏆 Jackpot Pot</span>
+                <span class="text-xs sm:text-sm">🥇</span>
+            </div>
+            <div class="text-lg sm:text-3xl font-black text-white mt-1 sm:mt-2">
+                Ksh. {{ treasury.total_jackpot_pot|floatformat:0|intcomma }}
+            </div>
+            <div class="text-[10px] sm:text-[11px] text-purple-300/80 mt-0.5 sm:mt-1 truncate">
+                Season podium fund
+            </div>
+        </div>
+
+        <!-- Weekly Prizes -->
+        <div class="bg-gray-900/90 border border-emerald-500/30 rounded-2xl p-3.5 sm:p-5 shadow-lg relative overflow-hidden group hover:border-emerald-500/60 transition-all">
+            <div class="flex items-center justify-between">
+                <span class="text-[10px] sm:text-xs font-bold text-emerald-400 uppercase tracking-wider">💰 Weekly Prizes</span>
+                <span class="text-xs sm:text-sm">💵</span>
+            </div>
+            <div class="text-lg sm:text-3xl font-black text-white mt-1 sm:mt-2">
+                Ksh. {{ treasury.total_prizes_distributed|floatformat:0|intcomma }}
+            </div>
+            <div class="text-[10px] sm:text-[11px] text-emerald-400 mt-0.5 sm:mt-1 truncate">
+                Paid to Top 3 weekly
+            </div>
+        </div>
+
+        <!-- Total Revenue -->
+        <div class="bg-gray-900/90 border border-cyan-500/30 rounded-2xl p-3.5 sm:p-5 shadow-lg relative overflow-hidden group hover:border-cyan-500/60 transition-all">
+            <div class="flex items-center justify-between">
+                <span class="text-[10px] sm:text-xs font-bold text-cyan-400 uppercase tracking-wider">⚡ Total Revenue</span>
+                <span class="text-xs sm:text-sm">📊</span>
+            </div>
+            <div class="text-lg sm:text-3xl font-black text-white mt-1 sm:mt-2">
+                Ksh. {{ treasury.total_revenue_collected|floatformat:0|intcomma }}
+            </div>
+            <div class="text-[10px] sm:text-[11px] text-cyan-300/80 mt-0.5 sm:mt-1 truncate">
+                {{ treasury.verified_payments_count }} Verified Payments
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Official Style Leaderboard Table with Tracker Arrows -->
+    <div class="bg-gray-900 border border-gray-800 rounded-2xl sm:rounded-3xl shadow-xl overflow-hidden">
+        
+        <!-- Table Header Banner -->
+        <div class="bg-gradient-to-r from-purple-950 via-gray-900 to-gray-900 px-4 sm:px-6 py-3.5 sm:py-4 border-b border-gray-800 flex items-center justify-between">
+            <div class="flex items-center space-x-2">
+                <i data-lucide="trophy" class="w-4 h-4 sm:w-5 sm:h-5 text-fpl-green"></i>
+                <h2 class="text-sm sm:text-base font-black text-white tracking-wide">LEAGUE TABLE</h2>
+            </div>
+            <div class="flex items-center space-x-2 sm:space-x-3 text-xs">
+                <span class="text-gray-400 hidden sm:inline">10 Managers</span>
+                <a href="{% url 'standings' %}" class="font-bold text-fpl-green hover:underline flex items-center text-xs">
+                    Filter <i data-lucide="chevron-right" class="w-3.5 h-3.5 ml-0.5"></i>
+                </a>
+            </div>
+        </div>
+
+        <div class="overflow-x-auto" style="-webkit-overflow-scrolling: touch;">
+            <table class="w-full text-left text-xs sm:text-sm text-gray-300">
+                <thead class="text-[10px] sm:text-xs uppercase bg-gray-800/90 text-gray-400 font-bold border-b border-gray-800">
+                    <tr>
+                        <th class="px-3 sm:px-5 py-3 text-center w-14 sm:w-20">Pos</th>
+                        <th class="px-3 sm:px-5 py-3 min-w-[140px] sm:min-w-0">Club & Manager</th>
+                        <th class="px-2 sm:px-5 py-3 text-center min-w-[65px]">Latest GW</th>
+                        <th class="px-3 sm:px-5 py-3 text-center font-black text-fpl-green min-w-[75px]">Total Pts</th>
+                        <th class="px-2 sm:px-5 py-3 text-center min-w-[80px]">Prizes Won</th>
+                        <th class="px-3 sm:px-5 py-3 text-right">View</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-800/80 font-medium">
+                    {% for row in standings_summary %}
+                    <tr class="hover:bg-purple-950/20 transition-colors {% if row.rank <= 3 %}bg-purple-950/10{% endif %}">
+                        
+                        <!-- Pos & Tracker Arrow -->
+                        <td class="px-3 sm:px-5 py-3 sm:py-4 text-center">
+                            <div class="flex items-center justify-center space-x-1 font-mono">
+                                <!-- Rank Number / Badge -->
+                                {% if row.rank == 1 %}
+                                <span class="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-amber-400 text-black flex items-center justify-center text-[10px] sm:text-xs font-black shadow-md">1</span>
+                                {% elif row.rank == 2 %}
+                                <span class="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-slate-300 text-black flex items-center justify-center text-[10px] sm:text-xs font-black shadow-md">2</span>
+                                {% elif row.rank == 3 %}
+                                <span class="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-amber-700 text-white flex items-center justify-center text-[10px] sm:text-xs font-black shadow-md">3</span>
+                                {% else %}
+                                <span class="text-gray-300 font-bold text-xs sm:text-sm">{{ row.rank }}</span>
+                                {% endif %}
+
+                                <!-- Tracker Arrow Movement -->
+                                <span class="text-[10px] sm:text-xs {{ row.movement.color }}" title="Movement vs previous GW">
+                                    {{ row.movement.symbol }}{% if row.movement.diff > 0 %}{{ row.movement.diff }}{% endif %}
+                                </span>
+                            </div>
+                        </td>
+
+                        <!-- Club & Manager Info -->
+                        <td class="px-3 sm:px-5 py-3 sm:py-4">
+                            <div class="flex items-center space-x-2 sm:space-x-3">
+                                <div class="w-7 h-7 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl bg-gray-800 border border-purple-800/60 flex items-center justify-center font-bold text-[10px] sm:text-xs text-white flex-shrink-0">
+                                    {{ row.member.manager_name|slice:":1" }}
+                                </div>
+                                <div class="min-w-0">
+                                    <a href="{% url 'manager_detail' row.member.id %}" class="font-bold text-white hover:text-fpl-green transition-colors text-xs sm:text-sm block truncate">
+                                        {{ row.member.team_name }}
+                                    </a>
+                                    <div class="text-[10px] sm:text-xs text-gray-400 truncate">{{ row.member.manager_name }}</div>
+                                </div>
+                            </div>
+                        </td>
+
+                        <!-- Latest GW Points -->
+                        <td class="px-2 sm:px-5 py-3 sm:py-4 text-center font-mono text-xs sm:text-sm">
+                            <span class="text-white font-bold">{{ row.latest_gw_net }}</span>
+                            {% if row.latest_gw_hits > 0 %}
+                            <span class="text-[9px] sm:text-[10px] text-red-400 block sm:inline">(-{{ row.latest_gw_hits }})</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Total Points -->
+                        <td class="px-3 sm:px-5 py-3 sm:py-4 text-center font-mono font-black text-xs sm:text-base">
+                            <span class="px-2 sm:px-3 py-0.5 sm:py-1 rounded-lg bg-gray-800 border border-gray-700 text-fpl-green">
+                                {{ row.total_points }}
+                            </span>
+                        </td>
+
+                        <!-- Prizes Won -->
+                        <td class="px-2 sm:px-5 py-3 sm:py-4 text-center font-mono font-bold text-xs sm:text-sm">
+                            {% if row.total_won > 0 %}
+                            <span class="text-emerald-400">Ksh. {{ row.total_won|floatformat:0 }}</span>
+                            {% else %}
+                            <span class="text-gray-500">-</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Action Link -->
+                        <td class="px-3 sm:px-5 py-3 sm:py-4 text-right">
+                            <a href="{% url 'manager_detail' row.member.id %}" class="p-1 sm:p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-purple-900/60 inline-flex items-center transition-colors">
+                                <i data-lucide="chevron-right" class="w-3.5 h-3.5 sm:w-4 sm:h-4"></i>
+                            </a>
+                        </td>
+
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Gameweek Podium Cards (Updates Dynamically per GW) -->
+    {% if selected_podium_gw and gw_podium %}
+    <div class="bg-gray-900 border border-gray-800 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-xl">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-3 sm:pb-4 border-b border-gray-800 mb-4 sm:mb-5 gap-2 sm:gap-0">
+            <div>
+                <div class="flex items-center space-x-2">
+                    <span class="text-[10px] sm:text-xs font-bold text-fpl-green uppercase tracking-wider">
+                        {{ selected_podium_gw.name }} Podium
+                    </span>
+                    {% if selected_podium_gw == latest_finished_gw %}
+                    <span class="bg-fpl-green/10 text-fpl-green text-[9px] font-bold px-1.5 py-0.2 rounded border border-fpl-green/30">Latest</span>
+                    {% endif %}
+                </div>
+                <h3 class="text-base sm:text-lg font-bold text-white mt-0.5">Top 3 Weekly Winners & Payouts</h3>
+            </div>
+
+            <div class="flex items-center space-x-3">
+                {% if finished_gws|length > 1 %}
+                <!-- GW Selector Form -->
+                <form method="GET" action="{% url 'dashboard' %}" class="flex items-center space-x-1.5">
+                    <label class="text-[10px] text-gray-400 font-bold uppercase hidden sm:inline">GW:</label>
+                    <select name="podium_gw" onchange="this.form.submit()" class="bg-gray-800 border border-purple-700/60 text-white text-xs font-semibold rounded-lg px-2.5 py-1 focus:ring-fpl-green">
+                        {% for gw in finished_gws %}
+                        <option value="{{ gw.number }}" {% if selected_podium_gw.number == gw.number %}selected{% endif %}>
+                            {{ gw.name }} {% if gw == latest_finished_gw %}(Latest){% endif %}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </form>
+                {% endif %}
+                <span class="text-[11px] sm:text-xs text-gray-400">Prize: Ksh. {{ selected_podium_gw.prize_pool_amount|floatformat:0 }}</span>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
+            {% for winner in gw_podium %}
+            <div class="rounded-2xl p-4 sm:p-5 border {% if winner.league_rank == 1 %}bg-gradient-to-b from-amber-950/30 to-gray-900 border-amber-500/40{% elif winner.league_rank == 2 %}bg-gradient-to-b from-slate-900/50 to-gray-900 border-slate-400/30{% else %}bg-gradient-to-b from-amber-900/20 to-gray-900 border-amber-700/30{% endif %}">
+                <div class="flex items-center justify-between">
+                    <span class="px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-black {% if winner.league_rank == 1 %}bg-amber-400 text-black{% elif winner.league_rank == 2 %}bg-slate-300 text-black{% else %}bg-amber-700 text-white{% endif %}">
+                        {% if winner.league_rank == 1 %}🥇 1st Place{% elif winner.league_rank == 2 %}🥈 2nd Place{% else %}🥉 3rd Place{% endif %}
+                    </span>
+                    <span class="text-sm sm:text-base font-black text-emerald-400 font-mono">
+                        Ksh. {{ winner.gw_prize_won|floatformat:2 }}
+                    </span>
+                </div>
+                <h4 class="text-sm sm:text-base font-bold text-white mt-2.5 sm:mt-3 truncate">
+                    <a href="{% url 'manager_detail' winner.member.id %}" class="hover:text-fpl-green transition-colors">
+                        {{ winner.member.manager_name }}
+                    </a>
+                </h4>
+                <p class="text-[11px] sm:text-xs text-gray-400 mt-0.5 truncate">{{ winner.member.team_name }}</p>
+                <div class="mt-2.5 sm:mt-3 pt-2.5 sm:pt-3 border-t border-gray-800/80 flex items-center justify-between text-[11px] sm:text-xs text-gray-300">
+                    <span>Net Points: <strong class="text-white font-mono">{{ winner.net_points }} pts</strong></span>
+                    <span class="text-gray-500 text-[10px] sm:text-[11px]">Gross: {{ winner.gw_points }} | -{{ winner.transfer_cost }}</span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}

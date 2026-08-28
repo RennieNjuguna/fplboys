@@ -1,0 +1,318 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block title %}Treasurer Admin Portal - FPL Boys{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <!-- Header & Sync FPL Action Bar -->
+    <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+            <div class="flex items-center space-x-2">
+                <i data-lucide="wallet" class="w-6 h-6 text-emerald-400"></i>
+                <h1 class="text-2xl sm:text-3xl font-black text-white">TREASURER PORTAL</h1>
+            </div>
+            <p class="text-xs sm:text-sm text-gray-400 mt-1">
+                Record new M-Pesa payments, edit or delete transactions, and trigger live FPL synchronizations.
+            </p>
+        </div>
+
+        <div class="flex items-center space-x-2.5">
+            <!-- Sync FPL Action Form -->
+            <form method="POST" action="{% url 'treasurer_portal' %}">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="sync_fpl">
+                <button type="submit" class="inline-flex items-center px-4 py-2.5 bg-purple-900 hover:bg-purple-800 text-fpl-green text-xs font-bold rounded-xl border border-purple-700/80 shadow transition-all">
+                    <i data-lucide="refresh-cw" class="w-3.5 h-3.5 mr-2"></i> Sync with FPL
+                </button>
+            </form>
+
+            <!-- Lock Admin Session -->
+            <a href="{% url 'treasury_lock' %}" class="inline-flex items-center px-3.5 py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs font-bold rounded-xl border border-gray-700 transition-colors">
+                <i data-lucide="lock" class="w-3.5 h-3.5 mr-1.5"></i> Lock Portal
+            </a>
+        </div>
+    </div>
+
+    <!-- 2 Column Layout: Fast Form on Left, Transactions Management on Right -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <!-- Left: Fast Payment Entry Form -->
+        <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl h-fit">
+            <h2 class="text-sm font-bold text-white flex items-center pb-3 border-b border-gray-800 mb-4">
+                <i data-lucide="plus-circle" class="w-4 h-4 mr-2 text-emerald-400"></i> Log M-Pesa Payment
+            </h2>
+
+            <form method="POST" action="{% url 'treasurer_portal' %}" class="space-y-3.5" id="payment-form">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="save_payment">
+
+                <!-- Member Field -->
+                <div>
+                    <label class="block text-[11px] font-bold text-gray-300 uppercase tracking-wider mb-1">Member / Manager</label>
+                    {{ form.member }}
+                </div>
+
+                <!-- Gameweek Field -->
+                <div>
+                    <label class="block text-[11px] font-bold text-gray-300 uppercase tracking-wider mb-1">Gameweek</label>
+                    {{ form.gameweek }}
+                </div>
+
+                <!-- Timestamp Received -->
+                <div>
+                    <label class="block text-[11px] font-bold text-gray-300 uppercase tracking-wider mb-1">
+                        Timestamp Received <span class="text-fpl-green font-mono text-[10px] lowercase">(GMT+3 EAT)</span>
+                    </label>
+                    {{ form.timestamp_received }}
+                </div>
+
+
+                <!-- Dynamic Deadline Status Warning Box -->
+                <div id="deadline-status-box" class="p-2.5 rounded-xl border text-xs font-medium bg-gray-800/60 border-gray-700 text-gray-300 transition-all">
+                    <div class="flex items-center space-x-2">
+                        <i data-lucide="info" class="w-3.5 h-3.5 text-purple-400 flex-shrink-0"></i>
+                        <span id="deadline-status-text" class="text-[11px]">Select Gameweek to verify deadline...</span>
+                    </div>
+                </div>
+
+                <!-- Amount Field -->
+                <div>
+                    <label class="block text-[11px] font-bold text-gray-300 uppercase tracking-wider mb-1">Amount Paid (Ksh.)</label>
+                    {{ form.amount_paid }}
+                    <span class="text-[10px] text-gray-400 mt-0.5 block">Standard: Ksh. 150 | Late: Ksh. 200 (+50 BBQ fine)</span>
+                </div>
+
+                <!-- M-Pesa Reference Code -->
+                <div>
+                    <label class="block text-[11px] font-bold text-gray-300 uppercase tracking-wider mb-1">M-Pesa Reference Code</label>
+                    {{ form.mpesa_code }}
+                </div>
+
+                <!-- Notes -->
+                <div>
+                    <label class="block text-[11px] font-bold text-gray-300 uppercase tracking-wider mb-1">Notes</label>
+                    {{ form.notes }}
+                </div>
+
+                <!-- Verified Checkbox -->
+                <div class="flex items-center space-x-2 pt-1">
+                    {{ form.verified }}
+                    <label class="text-xs font-semibold text-gray-300">Mark Verified</label>
+                </div>
+
+                <button type="submit" class="w-full mt-2 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-lg transition-all flex items-center justify-center">
+                    <i data-lucide="check" class="w-4 h-4 mr-1.5"></i> Save Payment / Bulk Pay
+                </button>
+            </form>
+
+            <!-- Prize Winnings to Future GWs Reinvestment Tool -->
+            <div class="mt-6 pt-5 border-t border-gray-800">
+                <div class="flex items-center space-x-2 pb-2 mb-3">
+                    <i data-lucide="trophy" class="w-4 h-4 text-amber-400"></i>
+                    <h3 class="text-xs font-bold text-white uppercase tracking-wider">Use Prize Winnings for Future GWs</h3>
+                </div>
+                <p class="text-[10px] text-gray-400 mb-3">
+                    Convert accumulated cash winnings into future GW contributions (Ksh. 150/GW).
+                </p>
+
+                <form method="POST" action="{% url 'treasurer_portal' %}" class="space-y-3">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="apply_winnings">
+
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-300 uppercase tracking-wider mb-1">Select Winner</label>
+                        <select name="member_id" id="winnings-member-select" onchange="updateAvailableWinnings()" required class="bg-gray-800 border border-purple-700/60 text-white text-xs font-semibold rounded-xl focus:ring-fpl-green focus:border-fpl-green block w-full p-2.5">
+                            <option value="">-- Choose Member --</option>
+                            {% for item in members_winnings_list %}
+                            <option value="{{ item.member.id }}" data-avail="{{ item.available_winnings }}">
+                                {{ item.member.manager_name }} (Avail: Ksh. {{ item.available_winnings|floatformat:0 }})
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-300 uppercase tracking-wider mb-1">Amount to Convert (Ksh.)</label>
+                        <input type="number" name="amount_to_apply" id="winnings-amount-input" step="0.01" value="150.00" min="1" required class="bg-gray-800 border border-purple-700/60 text-white text-xs font-mono font-bold rounded-xl focus:ring-fpl-green focus:border-fpl-green block w-full p-2.5">
+                    </div>
+
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-300 uppercase tracking-wider mb-1">Starting Gameweek (Optional)</label>
+                        <select name="start_gw" class="bg-gray-800 border border-purple-700/60 text-white text-xs font-semibold rounded-xl focus:ring-fpl-green focus:border-fpl-green block w-full p-2.5">
+                            <option value="">Next Unpaid GW (Auto)</option>
+                            {% for gw in all_gws %}
+                            <option value="{{ gw.number }}">{{ gw.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <button type="submit" class="w-full mt-1 py-2.5 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-black font-black text-xs uppercase tracking-wider rounded-xl shadow-lg transition-all flex items-center justify-center">
+                        <i data-lucide="award" class="w-4 h-4 mr-1.5"></i> Apply Winnings to Future GWs
+                    </button>
+                </form>
+            </div>
+        </div>
+
+
+        <!-- Right 2 Columns: Full Payments Management Table (CRUD Actions) -->
+        <div class="lg:col-span-2 space-y-6">
+            
+            <!-- Payments Table with Edit and Delete -->
+            <div class="bg-gray-900 border border-gray-800 rounded-3xl shadow-xl overflow-hidden">
+                <div class="bg-gradient-to-r from-purple-950/60 to-gray-900 px-6 py-4 border-b border-gray-800 flex items-center justify-between">
+                    <h2 class="text-sm font-bold text-white flex items-center">
+                        <i data-lucide="list" class="w-4 h-4 mr-2 text-emerald-400"></i> All Payment Transactions ({{ all_payments.count }})
+                    </h2>
+                    <span class="text-xs text-gray-400">Manage & Audit</span>
+                </div>
+
+                <div class="overflow-x-auto max-h-[500px]">
+                    <table class="w-full text-left text-xs text-gray-300">
+                        <thead class="sticky top-0 bg-gray-850 uppercase text-gray-400 font-bold border-b border-gray-800 z-10">
+                            <tr>
+                                <th class="px-4 py-3">Manager</th>
+                                <th class="px-4 py-3 text-center">GW</th>
+                                <th class="px-4 py-3 text-center">Amount</th>
+                                <th class="px-4 py-3 text-center">Status</th>
+                                <th class="px-4 py-3">M-Pesa Ref</th>
+                                <th class="px-4 py-3 text-right">Time (GMT+3)</th>
+                                <th class="px-4 py-3 text-center">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-800 font-mono">
+                            {% for p in all_payments %}
+                            <tr class="hover:bg-purple-950/20 font-sans">
+                                <td class="px-4 py-3 font-bold text-white">
+                                    {{ p.member.manager_name }}
+                                </td>
+                                <td class="px-4 py-3 text-center font-mono font-bold">
+                                    GW {{ p.gameweek.number }}
+                                </td>
+                                <td class="px-4 py-3 text-center font-mono font-bold text-emerald-400">
+                                    Ksh. {{ p.amount_paid|floatformat:0 }}
+                                </td>
+                                <td class="px-4 py-3 text-center">
+                                    {% if p.is_late %}
+                                    <span class="bg-amber-950 text-amber-300 border border-amber-800 px-1.5 py-0.5 rounded text-[10px] font-bold">
+                                        Late (+50)
+                                    </span>
+                                    {% else %}
+                                    <span class="bg-emerald-950 text-emerald-300 border border-emerald-800 px-1.5 py-0.5 rounded text-[10px] font-bold">
+                                        On Time
+                                    </span>
+                                    {% endif %}
+                                </td>
+                                <td class="px-4 py-3 font-mono text-gray-300">
+                                    {{ p.mpesa_code|default:"-" }}
+                                </td>
+                                <td class="px-4 py-3 text-right font-mono text-gray-400 text-[11px]">
+                                    {{ p.timestamp_received|date:"d M, H:i" }} EAT
+                                </td>
+                                <td class="px-4 py-3 text-center">
+                                    <div class="flex items-center justify-center space-x-1.5">
+                                        <!-- Edit Payment Button -->
+                                        <a href="{% url 'payment_edit' p.id %}" class="p-1.5 bg-gray-800 hover:bg-gray-700 text-cyan-400 rounded-lg border border-gray-700 transition-colors" title="Edit Payment">
+                                            <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
+                                        </a>
+                                        <!-- Delete Payment Button -->
+                                        <a href="{% url 'payment_delete' p.id %}" class="p-1.5 bg-gray-800 hover:bg-rose-950 text-rose-400 hover:text-rose-300 rounded-lg border border-gray-700 hover:border-rose-800 transition-colors" title="Delete Payment">
+                                            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="7" class="text-center py-6 text-gray-500 font-sans">No payments recorded yet.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Treasury Audit Logs -->
+            <div class="bg-gray-900 border border-gray-800 rounded-3xl p-5 shadow-xl">
+                <h3 class="text-xs font-bold text-white uppercase tracking-wider flex items-center pb-3 border-b border-gray-800 mb-3">
+                    <i data-lucide="shield-check" class="w-4 h-4 mr-2 text-purple-400"></i> Audit Activity Trail (GMT+3)
+                </h3>
+
+                <div class="space-y-2.5 max-h-56 overflow-y-auto">
+                    {% for log in audit_logs %}
+                    <div class="p-2.5 bg-gray-800/40 border border-gray-800 rounded-xl flex items-start justify-between text-xs">
+                        <div>
+                            <span class="font-bold text-purple-300 font-mono text-[10px]">[{{ log.action }}]</span>
+                            <p class="text-gray-300 text-[11px] mt-0.5">{{ log.description }}</p>
+                        </div>
+                        <span class="text-gray-500 text-[10px] font-mono ml-2 whitespace-nowrap">{{ log.created_at|date:"d M H:i" }} EAT</span>
+                    </div>
+                    {% empty %}
+                    <div class="text-xs text-gray-500 text-center py-3">No logs recorded.</div>
+                    {% endfor %}
+                </div>
+            </div>
+
+
+        </div>
+
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const gwSelect = document.getElementById('id_gameweek');
+    const timeInput = document.getElementById('id_timestamp_received');
+    const amountInput = document.getElementById('id_amount_paid');
+    const statusBox = document.getElementById('deadline-status-box');
+    const statusText = document.getElementById('deadline-status-text');
+
+    async function checkDeadline() {
+        if (!gwSelect || !gwSelect.value) return;
+        const gwId = gwSelect.value;
+        const timeVal = timeInput ? timeInput.value : '';
+
+        try {
+            const resp = await fetch(`{% url "api_check_deadline" %}?gw_id=${gwId}&timestamp=${encodeURIComponent(timeVal)}`);
+            const data = await resp.json();
+
+            statusText.innerText = data.message;
+            if (data.is_late) {
+                statusBox.className = 'p-2.5 rounded-xl border text-xs font-medium bg-amber-950/70 border-amber-700 text-amber-200 transition-all';
+                if (amountInput && (amountInput.value === '150.00' || amountInput.value === '150' || !amountInput.value)) {
+                    amountInput.value = '200.00';
+                }
+            } else {
+                statusBox.className = 'p-2.5 rounded-xl border text-xs font-medium bg-emerald-950/70 border-emerald-700 text-emerald-200 transition-all';
+                if (amountInput && (amountInput.value === '200.00' || amountInput.value === '200')) {
+                    amountInput.value = '150.00';
+                }
+            }
+        } catch (e) {
+            console.error('Error checking deadline:', e);
+        }
+    }
+
+    function updateAvailableWinnings() {
+        const select = document.getElementById('winnings-member-select');
+        const amountInput = document.getElementById('winnings-amount-input');
+        if (!select || !amountInput) return;
+        const selectedOpt = select.options[select.selectedIndex];
+        const avail = parseFloat(selectedOpt.getAttribute('data-avail') || '0');
+        if (avail > 0) {
+            amountInput.max = avail;
+            amountInput.value = Math.min(avail, 150.00).toFixed(2);
+        } else {
+            amountInput.value = '0.00';
+        }
+    }
+
+    if (gwSelect) gwSelect.addEventListener('change', checkDeadline);
+    if (timeInput) timeInput.addEventListener('change', checkDeadline);
+    document.addEventListener('DOMContentLoaded', checkDeadline);
+</script>
+
+{% endblock %}

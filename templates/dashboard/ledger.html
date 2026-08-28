@@ -1,0 +1,477 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block title %}Financial Ledger & Earnings - FPL Boys{% endblock %}
+
+{% block content %}
+<div class="space-y-5 sm:space-y-6">
+
+    <!-- Header & Tab Navigation Bar -->
+    <div class="bg-gray-900 border border-gray-800 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+            <div class="flex items-center space-x-2">
+                <i data-lucide="table-properties" class="w-5 h-5 sm:w-6 sm:h-6 text-fpl-green"></i>
+                <h1 class="text-xl sm:text-3xl font-black text-white">FINANCIAL LEDGER</h1>
+            </div>
+            <p class="text-xs sm:text-sm text-gray-400 mt-1">
+                Full transparency ledger tracking weekly contributions, late fines, prize payouts, and net member earnings.
+            </p>
+        </div>
+
+        <!-- 2 Clean Tab Switchers (Full width grid on mobile) -->
+        <div class="grid grid-cols-2 bg-gray-850 p-1 rounded-2xl border border-gray-800 w-full sm:w-auto">
+            <a href="?tab=contributions" class="px-3 sm:px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center space-x-1.5 {% if active_tab != 'earnings' %}bg-purple-900 text-fpl-green shadow-sm border border-purple-700/60{% else %}text-gray-400 hover:text-white{% endif %}">
+                <i data-lucide="calendar" class="w-3.5 h-3.5 flex-shrink-0"></i>
+                <span>1. GW Contributions</span>
+            </a>
+            <a href="?tab=earnings" class="px-3 sm:px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center space-x-1.5 {% if active_tab == 'earnings' %}bg-purple-900 text-fpl-green shadow-sm border border-purple-700/60{% else %}text-gray-400 hover:text-white{% endif %}">
+                <i data-lucide="trending-up" class="w-3.5 h-3.5 flex-shrink-0"></i>
+                <span>2. Earnings & Graphs</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Summary KPI Cards (2x2 on phone) -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3.5">
+        <div class="bg-gray-900 border border-gray-800 p-3 sm:p-4 rounded-2xl">
+            <span class="text-[9px] sm:text-[10px] text-gray-400 uppercase font-bold tracking-wider truncate block">Total Collected</span>
+            <div class="text-lg sm:text-xl font-black text-white mt-0.5 sm:mt-1">Ksh. {{ matrix.grand_total_collected|floatformat:0|intcomma }}</div>
+        </div>
+        <div class="bg-gray-900 border border-gray-800 p-3 sm:p-4 rounded-2xl">
+            <span class="text-[9px] sm:text-[10px] text-amber-400 uppercase font-bold tracking-wider truncate block">Late Fines (BBQ)</span>
+            <div class="text-lg sm:text-xl font-black text-amber-300 mt-0.5 sm:mt-1">Ksh. {{ matrix.grand_total_fines|floatformat:0|intcomma }}</div>
+        </div>
+        <div class="bg-gray-900 border border-gray-800 p-3 sm:p-4 rounded-2xl">
+            <span class="text-[9px] sm:text-[10px] text-emerald-400 uppercase font-bold tracking-wider truncate block">Weekly Prizes Paid</span>
+            <div class="text-lg sm:text-xl font-black text-emerald-300 mt-0.5 sm:mt-1">Ksh. {{ matrix.grand_total_prizes|floatformat:0|intcomma }}</div>
+        </div>
+        <div class="bg-gray-900 border border-gray-800 p-3 sm:p-4 rounded-2xl">
+            <span class="text-[9px] sm:text-[10px] text-purple-400 uppercase font-bold tracking-wider truncate block">Jackpot Reserves</span>
+            <div class="text-lg sm:text-xl font-black text-purple-300 mt-0.5 sm:mt-1">Ksh. {{ treasury.total_jackpot_pot|floatformat:0|intcomma }}</div>
+        </div>
+    </div>
+
+    <!-- TAB 1: GW CONTRIBUTIONS (MATRIX GRID) -->
+    {% if active_tab != 'earnings' %}
+    <div class="space-y-3.5 sm:space-y-4">
+        
+        <!-- Legend & Fine Waiver Notice Bar -->
+        <div class="space-y-2.5">
+            <div class="bg-gray-900 border border-gray-800 rounded-2xl px-3.5 sm:px-5 py-2.5 sm:py-3 flex flex-wrap items-center justify-between gap-2 text-xs">
+                <span class="font-bold text-white text-[11px] sm:text-xs uppercase tracking-wider">Legend:</span>
+                <div class="flex flex-wrap items-center gap-2 text-[10px] sm:text-xs">
+                    <div class="flex items-center space-x-1.5 bg-emerald-950/70 border border-emerald-800/80 px-2 py-0.5 rounded-lg text-emerald-300">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                        <span class="font-semibold">Paid (150)</span>
+                    </div>
+                    <div class="flex items-center space-x-1.5 bg-amber-950/70 border border-amber-700/80 px-2 py-0.5 rounded-lg text-amber-300">
+                        <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                        <span class="font-semibold">Partial (&lt;150)</span>
+                    </div>
+                    <div class="flex items-center space-x-1.5 bg-amber-950/70 border border-amber-800/80 px-2 py-0.5 rounded-lg text-amber-300">
+                        <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                        <span class="font-semibold">Late (+50 fine)</span>
+                    </div>
+                    <div class="flex items-center space-x-1.5 bg-rose-950/70 border border-rose-800/80 px-2 py-0.5 rounded-lg text-rose-300">
+                        <span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
+                        <span class="font-semibold">Due (150)</span>
+                    </div>
+                    <div class="flex items-center space-x-1.5 bg-purple-950/70 border border-purple-800/80 px-2 py-0.5 rounded-lg text-purple-300">
+                        <span class="w-1.5 h-1.5 rounded-full bg-purple-400"></span>
+                        <span class="font-semibold">Waiver (No fine)</span>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Fine Waiver Banner -->
+            <div class="bg-purple-950/40 border border-purple-800/60 rounded-2xl px-4 py-2.5 text-xs text-purple-200 flex items-start sm:items-center space-x-2">
+                <span class="text-sm">🎁</span>
+                <div>
+                    <strong class="text-fpl-green">Fine Waiver Rule:</strong> GW1 (start of season), GW2 (teams not yet set up), GW19 (mid-season), and GW38 (end of season) do not get late fines.
+                </div>
+            </div>
+        </div>
+
+
+        <!-- Excel-Style Matrix Table with Smooth Touch Scrolling -->
+        <div class="bg-gray-900 border border-gray-800 rounded-2xl sm:rounded-3xl shadow-xl overflow-hidden">
+            <div class="overflow-x-auto max-h-[580px] relative" style="-webkit-overflow-scrolling: touch;">
+                <table class="w-full text-xs text-left border-collapse">
+                    
+                    <!-- Table Header -->
+                    <thead class="sticky top-0 z-30 bg-gray-900 shadow-md">
+                        <tr class="border-b border-gray-800 text-gray-400 font-bold uppercase">
+                            
+                            <!-- Sticky Manager Column -->
+                            <th class="sticky left-0 z-40 bg-gray-900 px-3 sm:px-4 py-3 sm:py-3.5 min-w-[130px] sm:min-w-[170px] border-r border-gray-800 text-[10px] sm:text-xs">
+                                Manager & Team
+                            </th>
+
+                            <!-- GW Columns (GW 1 to 38) -->
+                            {% for gw in matrix.gameweeks %}
+                            <th class="px-2 sm:px-3 py-2 text-center min-w-[75px] sm:min-w-[85px] border-r border-gray-800/60 {% if gw.is_current or gw.status == 'active' %}bg-purple-950/70 text-fpl-green{% elif gw.status == 'finished' %}bg-gray-800/80 text-gray-200{% else %}bg-gray-900/90 text-gray-500{% endif %}">
+                                <div class="font-bold text-[11px] sm:text-xs">GW {{ gw.number }}</div>
+                                <div class="text-[9px] font-normal lowercase tracking-normal">
+                                    {% if gw.status == 'finished' %}done{% elif gw.status == 'active' %}live{% else %}{{ gw.deadline_eat|date:"d M" }}{% endif %}
+                                </div>
+                            </th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+
+                    <!-- Members Rows -->
+                    <tbody class="divide-y divide-gray-800/80 font-mono">
+                        {% for row in matrix.rows %}
+                        <tr class="hover:bg-purple-950/20 transition-colors">
+                            
+                            <!-- Sticky Manager Name -->
+                            <td class="sticky left-0 z-20 bg-gray-900/95 px-3 sm:px-4 py-3 sm:py-3.5 font-sans border-r border-gray-800">
+                                <a href="{% url 'manager_detail' row.member.id %}" class="font-bold text-white hover:text-fpl-green transition-colors block text-[11px] sm:text-xs truncate">
+                                    {{ row.member.manager_name }}
+                                </a>
+                                <span class="text-[9px] sm:text-[10px] text-gray-400 block font-normal truncate">{{ row.member.team_name }}</span>
+                            </td>
+
+                            <!-- GW Cells -->
+                            {% for cell in row.cells %}
+                            <td class="px-1.5 sm:px-2 py-2 sm:py-2.5 text-center border-r border-gray-800/40 {% if cell.status == 'PAID' %}bg-emerald-950/30 text-emerald-300{% elif cell.status == 'PARTIAL' %}bg-amber-950/20 text-amber-300{% elif cell.status == 'LATE' %}bg-amber-950/40 text-amber-300{% elif cell.status == 'UNPAID' %}bg-rose-950/40 text-rose-300{% else %}bg-gray-900/30 text-gray-600{% endif %}">
+                                
+                                {% if cell.status == 'PAID' %}
+                                <div class="font-bold text-[10px] sm:text-[11px] text-emerald-300">
+                                    ✓ {{ cell.amount_paid|floatformat:0 }}
+                                </div>
+                                {% if 'PRIZE' in cell.mpesa_code|default:'' %}
+                                <div class="text-[8px] text-purple-300 font-semibold tracking-tight" title="Paid using reinvested prize winnings">From Pot</div>
+                                {% elif 'Carryover' in cell.mpesa_code|default:'' %}
+                                <div class="text-[8px] text-cyan-300 font-semibold tracking-tight" title="Paid in advance via bulk payment">Advance</div>
+                                {% endif %}
+
+                                {% elif cell.status == 'PARTIAL' %}
+                                <div class="font-bold text-[10px] sm:text-[11px] text-amber-300">
+                                    ◐ {{ cell.amount_paid|floatformat:0 }}
+                                </div>
+                                <div class="text-[8px] text-rose-300/90 font-semibold" title="Partial contribution. Balance remaining: Ksh. {{ cell.balance_due|floatformat:0 }}">
+                                    Bal: {{ cell.balance_due|floatformat:0 }}
+                                </div>
+
+                                {% elif cell.status == 'LATE' %}
+                                <div class="font-bold text-[10px] sm:text-[11px] text-amber-300">
+                                    ⚠️ {{ cell.amount_paid|floatformat:0 }}
+                                </div>
+                                <div class="text-[8px] text-amber-400 font-semibold">+50 fine</div>
+
+                                {% elif cell.status == 'UNPAID' %}
+                                <div class="font-bold text-[10px] sm:text-[11px] text-rose-400">
+                                    ✗ Due
+                                </div>
+                                <div class="text-[8px] text-rose-300/80">Ksh. 150</div>
+
+                                {% else %}
+                                <span class="text-gray-600">-</span>
+                                {% endif %}
+
+
+
+                            </td>
+                            {% endfor %}
+
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+
+                    <!-- Table Footer: Large GW Totals Bottom Row -->
+                    <tfoot class="sticky bottom-0 z-30 bg-gray-900 border-t-2 border-purple-700 shadow-2xl text-gray-200 font-bold">
+                        <tr>
+                            <!-- Sticky Bottom Left Label -->
+                            <td class="sticky left-0 z-40 bg-gray-900 px-3 sm:px-4 py-3.5 sm:py-4 border-r border-gray-800 uppercase font-black text-xs sm:text-sm text-fpl-green">
+                                GW Totals
+                            </td>
+
+                            <!-- Per-GW Columns Totals (Prominent font size) -->
+                            {% for col in matrix.column_summaries %}
+                            <td class="px-1.5 sm:px-2 py-3 sm:py-3.5 text-center border-r border-gray-800/60 bg-gray-850">
+                                {% if col.total_collected > 0 %}
+                                <div class="text-xs sm:text-sm text-white font-black font-mono leading-tight">
+                                    {{ col.total_collected|floatformat:0 }}
+                                </div>
+                                <div class="text-[9px] sm:text-[10px] text-fpl-green font-semibold">
+                                    {{ col.paid_count }}/10 paid
+                                </div>
+                                {% else %}
+                                <span class="text-gray-600 font-normal">-</span>
+                                {% endif %}
+                            </td>
+                            {% endfor %}
+                        </tr>
+                    </tfoot>
+
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- TAB 2: EARNINGS & INTERACTIVE GRAPHS -->
+    {% if active_tab == 'earnings' %}
+    <div class="space-y-5 sm:space-y-6">
+        
+        <!-- Member Earnings Summary Table -->
+        <div class="bg-gray-900 border border-gray-800 rounded-2xl sm:rounded-3xl shadow-xl overflow-hidden">
+            <div class="bg-gradient-to-r from-purple-950 to-gray-900 px-4 sm:px-6 py-3.5 sm:py-4 border-b border-gray-800 flex items-center justify-between">
+                <h2 class="text-xs sm:text-sm font-bold text-white flex items-center space-x-2">
+                    <i data-lucide="award" class="w-4 h-4 text-amber-400"></i>
+                    <span>Member Net Earnings Leaderboard</span>
+                </h2>
+                <span class="text-[10px] sm:text-xs text-gray-400 hidden sm:inline">Prizes Won - Total Paid</span>
+            </div>
+
+            <div class="overflow-x-auto" style="-webkit-overflow-scrolling: touch;">
+                <table class="w-full text-left text-xs sm:text-sm text-gray-300">
+                    <thead class="text-[10px] sm:text-xs uppercase bg-gray-800/80 text-gray-400 font-bold border-b border-gray-800">
+                        <tr>
+                            <th class="px-3 sm:px-6 py-3 text-center w-12 sm:w-16">Rank</th>
+                            <th class="px-3 sm:px-6 py-3 min-w-[130px]">Manager</th>
+                            <th class="px-2 sm:px-4 py-3 text-center min-w-[70px]">Podium</th>
+                            <th class="px-2 sm:px-4 py-3 text-center min-w-[80px]">Paid</th>
+                            <th class="px-2 sm:px-4 py-3 text-center min-w-[70px]">Fines</th>
+                            <th class="px-2 sm:px-4 py-3 text-center text-emerald-400 min-w-[85px]">Won</th>
+                            <th class="px-2 sm:px-4 py-3 text-center font-black min-w-[90px]">Net P/L</th>
+                            <th class="px-3 sm:px-6 py-3 text-right min-w-[70px]">Points</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-800/60 font-medium font-mono">
+                        {% for item in earnings_leaderboard %}
+                        <tr class="hover:bg-purple-950/20 transition-colors font-sans">
+                            <td class="px-3 sm:px-6 py-3 sm:py-4 text-center font-mono font-bold">
+                                {% if item.rank == 1 %}
+                                <span class="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-amber-400 text-black flex items-center justify-center text-[10px] sm:text-xs font-black mx-auto shadow-md">1</span>
+                                {% elif item.rank == 2 %}
+                                <span class="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-slate-300 text-black flex items-center justify-center text-[10px] sm:text-xs font-black mx-auto shadow-md">2</span>
+                                {% elif item.rank == 3 %}
+                                <span class="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-amber-700 text-white flex items-center justify-center text-[10px] sm:text-xs font-black mx-auto shadow-md">3</span>
+                                {% else %}
+                                <span class="text-gray-400 text-xs sm:text-sm">{{ item.rank }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-3 sm:px-6 py-3 sm:py-4">
+                                <a href="{% url 'manager_detail' item.member.id %}" class="font-bold text-white hover:text-fpl-green transition-colors text-xs sm:text-sm block truncate">
+                                    {{ item.member.manager_name }}
+                                </a>
+                                <div class="text-[10px] sm:text-xs text-gray-400 font-normal truncate">{{ item.member.team_name }}</div>
+                            </td>
+                            <td class="px-2 sm:px-4 py-3 sm:py-4 text-center font-mono">
+                                {% if item.top3_count > 0 %}
+                                <span class="bg-purple-900/60 text-fpl-cyan px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-bold border border-purple-700/50">
+                                    {{ item.top3_count }}x
+                                </span>
+                                {% else %}
+                                <span class="text-gray-500 text-xs">0</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-2 sm:px-4 py-3 sm:py-4 text-center font-mono text-gray-300 text-xs sm:text-sm">
+                                Ksh. {{ item.total_paid|floatformat:0 }}
+                            </td>
+                            <td class="px-2 sm:px-4 py-3 sm:py-4 text-center font-mono text-xs sm:text-sm">
+                                {% if item.total_fines > 0 %}
+                                <span class="text-amber-400 font-bold">Ksh. {{ item.total_fines|floatformat:0 }}</span>
+                                {% else %}
+                                <span class="text-gray-500">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-2 sm:px-4 py-3 sm:py-4 text-center font-mono font-bold text-emerald-400 text-xs sm:text-sm">
+                                Ksh. {{ item.total_won|floatformat:0 }}
+                            </td>
+                            <td class="px-2 sm:px-4 py-3 sm:py-4 text-center font-mono font-black text-xs sm:text-sm">
+                                {% if item.net_pl >= 0 %}
+                                <span class="px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg bg-emerald-950/80 border border-emerald-700 text-emerald-300">
+                                    +{{ item.net_pl|floatformat:0 }}
+                                </span>
+                                {% else %}
+                                <span class="px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg bg-rose-950/80 border border-rose-700 text-rose-300">
+                                    -{{ item.net_pl|floatformat:0|slice:"1:" }}
+                                </span>
+                                {% endif %}
+                            </td>
+                            <td class="px-3 sm:px-6 py-3 sm:py-4 text-right font-mono font-bold text-white text-xs sm:text-sm">
+                                {{ item.total_points }} pts
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 4 Interactive Charts Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+            
+            <!-- Chart 1: Cumulative Points Race -->
+            <div class="bg-gray-900 border border-gray-800 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-xl">
+                <div class="flex items-center justify-between pb-3 border-b border-gray-800 mb-4">
+                    <h3 class="text-xs sm:text-sm font-bold text-white flex items-center">
+                        <i data-lucide="line-chart" class="w-4 h-4 mr-2 text-fpl-green"></i> Cumulative Points Race
+                    </h3>
+                    <span class="text-[10px] sm:text-xs text-gray-400">10 Managers</span>
+                </div>
+                <div class="relative h-60 sm:h-72">
+                    <canvas id="pointsRaceChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Chart 2: Net Profit / Loss per Manager -->
+            <div class="bg-gray-900 border border-gray-800 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-xl">
+                <div class="flex items-center justify-between pb-3 border-b border-gray-800 mb-4">
+                    <h3 class="text-xs sm:text-sm font-bold text-white flex items-center">
+                        <i data-lucide="bar-chart-3" class="w-4 h-4 mr-2 text-fpl-cyan"></i> Net Profit / Loss (Ksh.)
+                    </h3>
+                    <span class="text-[10px] sm:text-xs text-gray-400">Gainers vs Losers</span>
+                </div>
+                <div class="relative h-60 sm:h-72">
+                    <canvas id="profitLossChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Chart 3: Weekly Gameweek Points Spread -->
+            <div class="bg-gray-900 border border-gray-800 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-xl">
+                <div class="flex items-center justify-between pb-3 border-b border-gray-800 mb-4">
+                    <h3 class="text-xs sm:text-sm font-bold text-white flex items-center">
+                        <i data-lucide="activity" class="w-4 h-4 mr-2 text-amber-400"></i> Points Spread (High, Avg, Low)
+                    </h3>
+                    <span class="text-[10px] sm:text-xs text-gray-400">GW Benchmark</span>
+                </div>
+                <div class="relative h-60 sm:h-72">
+                    <canvas id="weeklyDistributionChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Chart 4: Pots Allocation Breakdown -->
+            <div class="bg-gray-900 border border-gray-800 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-xl">
+                <div class="flex items-center justify-between pb-3 border-b border-gray-800 mb-4">
+                    <h3 class="text-xs sm:text-sm font-bold text-white flex items-center">
+                        <i data-lucide="pie-chart" class="w-4 h-4 mr-2 text-purple-400"></i> Treasury Pot Allocation
+                    </h3>
+                    <span class="text-[10px] sm:text-xs text-gray-400">Funds Breakdown</span>
+                </div>
+                <div class="relative h-60 sm:h-72 flex items-center justify-center">
+                    <canvas id="potsChart"></canvas>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if active_tab == 'earnings' %}
+<script>
+    document.addEventListener('DOMContentLoaded', async () => {
+        try {
+            const resp = await fetch('{% url "api_charts_data" %}');
+            const data = await resp.json();
+
+            // 1. Points Race Chart
+            new Chart(document.getElementById('pointsRaceChart'), {
+                type: 'line',
+                data: {
+                    labels: data.gw_labels,
+                    datasets: data.points_datasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { color: '#9ca3af', font: { size: 9 }, boxWidth: 8 }
+                        }
+                    },
+                    scales: {
+                        x: { grid: { color: '#1f2937' }, ticks: { color: '#9ca3af', font: { size: 10 } } },
+                        y: { grid: { color: '#1f2937' }, ticks: { color: '#9ca3af', font: { size: 10 } } }
+                    }
+                }
+            });
+
+            // 2. Profit / Loss Chart
+            new Chart(document.getElementById('profitLossChart'), {
+                type: 'bar',
+                data: {
+                    labels: data.pl_labels,
+                    datasets: [{
+                        label: 'Net P/L (Ksh.)',
+                        data: data.pl_data,
+                        backgroundColor: data.pl_colors,
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        x: { grid: { color: '#1f2937' }, ticks: { color: '#9ca3af', font: { size: 10 } } },
+                        y: { grid: { color: '#1f2937' }, ticks: { color: '#d1d5db', font: { size: 10 } } }
+                    }
+                }
+            });
+
+            // 3. Weekly Distribution Chart
+            new Chart(document.getElementById('weeklyDistributionChart'), {
+                type: 'bar',
+                data: {
+                    labels: data.gw_labels,
+                    datasets: [
+                        { label: 'Highest', data: data.weekly_high, backgroundColor: '#00ff87', borderRadius: 4 },
+                        { label: 'Average', data: data.weekly_avg, backgroundColor: '#02efff', borderRadius: 4 },
+                        { label: 'Lowest', data: data.weekly_low, backgroundColor: '#f43f5e', borderRadius: 4 }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { color: '#9ca3af', boxWidth: 8, font: { size: 10 } } }
+                    },
+                    scales: {
+                        x: { grid: { color: '#1f2937' }, ticks: { color: '#9ca3af', font: { size: 10 } } },
+                        y: { grid: { color: '#1f2937' }, ticks: { color: '#9ca3af', font: { size: 10 } } }
+                    }
+                }
+            });
+
+            // 4. Pots Breakdown Doughnut
+            new Chart(document.getElementById('potsChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: data.pots.labels,
+                    datasets: [{
+                        data: data.pots.data,
+                        backgroundColor: ['#f59e0b', '#8b5cf6', '#10b981'],
+                        borderWidth: 2,
+                        borderColor: '#111827'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { color: '#d1d5db', boxWidth: 10, font: { size: 10 } } }
+                    }
+                }
+            });
+
+        } catch (err) {
+            console.error('Error loading charts:', err);
+        }
+    });
+</script>
+{% endif %}
+{% endblock %}

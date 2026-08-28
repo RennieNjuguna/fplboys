@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}FPL Boys - Mini-League & Financial Ledger{% endblock %}</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        fpl: {
+                            purple: '#28022e',
+                            green: '#00ff87',
+                            cyan: '#02efff',
+                            pink: '#e90052',
+                            dark: '#0f0213',
+                            card: '#18041d',
+                            border: '#320e3a'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* Clean custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #090d16;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #1e293b;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #00ff87;
+        }
+        .glow-subtle {
+            box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.5);
+        }
+        /* Sidebar transition styles */
+        .sidebar-expanded {
+            width: 16rem;
+        }
+        .sidebar-collapsed {
+            width: 5rem;
+        }
+        .main-expanded {
+            margin-left: 16rem;
+        }
+        .main-collapsed {
+            margin-left: 5rem;
+        }
+    </style>
+</head>
+<body class="bg-gray-950 text-gray-100 min-h-screen font-sans antialiased selection:bg-fpl-green selection:text-black">
+
+    <!-- Mobile Top Navigation Header -->
+    <header class="md:hidden bg-fpl-purple border-b border-fpl-border sticky top-0 z-40 px-4 py-3 flex items-center justify-between shadow-lg">
+        <div class="flex items-center space-x-3">
+            <button id="mobile-sidebar-toggle" class="p-2 rounded-lg text-gray-300 hover:text-white hover:bg-purple-900/50 focus:outline-none">
+                <i data-lucide="menu" class="w-5 h-5"></i>
+            </button>
+            <a href="{% url 'dashboard' %}" class="flex items-center space-x-2">
+                <span class="w-7 h-7 rounded-lg bg-fpl-green text-black font-black flex items-center justify-center text-sm">⚽</span>
+                <span class="font-black text-base tracking-tight text-white">FPL BOYS</span>
+            </a>
+        </div>
+        <div class="flex items-center space-x-2">
+            {% if is_treasury_unlocked %}
+            <span class="bg-emerald-950/80 text-emerald-400 border border-emerald-700/80 text-[10px] px-2 py-0.5 rounded-full font-bold">Admin 🔓</span>
+            {% else %}
+            <span class="bg-gray-800 text-gray-400 border border-gray-700 text-[10px] px-2 py-0.5 rounded-full font-medium">Guest 🔒</span>
+            {% endif %}
+        </div>
+    </header>
+
+    <!-- Mobile Drawer Overlay -->
+    <div id="mobile-overlay" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 transition-opacity md:hidden"></div>
+
+    <!-- Desktop & Mobile Collapsible Left Sidebar -->
+    <aside id="sidebar" class="fixed top-0 left-0 bottom-0 z-50 bg-gradient-to-b from-fpl-purple via-fpl-dark to-gray-950 border-r border-fpl-border flex flex-col justify-between transition-all duration-300 sidebar-expanded -translate-x-full md:translate-x-0 shadow-2xl">
+        
+        <!-- Top Brand & Nav Links -->
+        <div>
+            <!-- Brand Logo Header -->
+            <div class="h-16 flex items-center justify-between px-4 border-b border-fpl-border/80">
+                <a href="{% url 'dashboard' %}" class="flex items-center space-x-3 overflow-hidden group">
+                    <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-fpl-green to-emerald-400 flex-shrink-0 flex items-center justify-center text-black font-black text-lg shadow-md group-hover:scale-105 transition-transform">
+                        ⚽
+                    </div>
+                    <div class="sidebar-text transition-opacity duration-200">
+                        <span class="text-base font-black tracking-tight text-white group-hover:text-fpl-green transition-colors block leading-tight">
+                            FPL BOYS
+                        </span>
+                        <span class="text-[10px] text-purple-300/80 font-mono block">League #1868934</span>
+                    </div>
+                </a>
+
+                <!-- Desktop Sidebar Toggle Button -->
+                <button id="desktop-sidebar-toggle" class="hidden md:flex p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-purple-900/60 focus:outline-none transition-colors" title="Toggle Sidebar">
+                    <i id="toggle-icon" data-lucide="chevron-left" class="w-4 h-4"></i>
+                </button>
+
+                <!-- Mobile Close Button -->
+                <button id="mobile-sidebar-close" class="md:hidden p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-purple-900 focus:outline-none">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <!-- Navigation Links -->
+            <nav class="p-3 space-y-1">
+                
+                <!-- Dashboard -->
+                <a href="{% url 'dashboard' %}" class="flex items-center px-3 py-2.5 rounded-xl text-sm font-semibold transition-all group {% if request.resolver_match.url_name == 'dashboard' %}bg-purple-900/50 text-fpl-green border border-purple-700/60 shadow-sm{% else %}text-gray-300 hover:text-white hover:bg-purple-950/40{% endif %}" title="Dashboard">
+                    <i data-lucide="layout-dashboard" class="w-4 h-4 flex-shrink-0 text-fpl-green group-hover:scale-110 transition-transform"></i>
+                    <span class="ml-3 sidebar-text whitespace-nowrap">Dashboard</span>
+                </a>
+
+                <!-- Leaderboard & Standings Hub -->
+                <a href="{% url 'standings' %}" class="flex items-center px-3 py-2.5 rounded-xl text-sm font-semibold transition-all group {% if request.resolver_match.url_name == 'standings' %}bg-purple-900/50 text-fpl-green border border-purple-700/60 shadow-sm{% else %}text-gray-300 hover:text-white hover:bg-purple-950/40{% endif %}" title="Leaderboard">
+                    <i data-lucide="trophy" class="w-4 h-4 flex-shrink-0 text-amber-400 group-hover:scale-110 transition-transform"></i>
+                    <span class="ml-3 sidebar-text whitespace-nowrap">Leaderboard</span>
+                </a>
+
+                <!-- Financial Ledger & Earnings (Public) -->
+                <a href="{% url 'financial_ledger' %}" class="flex items-center px-3 py-2.5 rounded-xl text-sm font-semibold transition-all group {% if request.resolver_match.url_name == 'financial_ledger' %}bg-purple-900/50 text-fpl-green border border-purple-700/60 shadow-sm{% else %}text-gray-300 hover:text-white hover:bg-purple-950/40{% endif %}" title="Financial Ledger & Earnings">
+                    <i data-lucide="table-properties" class="w-4 h-4 flex-shrink-0 text-cyan-400 group-hover:scale-110 transition-transform"></i>
+                    <span class="ml-3 sidebar-text whitespace-nowrap">Financial Ledger</span>
+                </a>
+
+                <!-- Treasury Portal (Locked Admin Only) -->
+                <div class="pt-4 pb-1">
+                    <div class="px-3 text-[10px] font-bold uppercase tracking-wider text-gray-500 sidebar-text">
+                        Treasurer Tools
+                    </div>
+                </div>
+
+                <a href="{% url 'treasurer_portal' %}" class="flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-semibold transition-all group {% if request.resolver_match.url_name == 'treasurer_portal' or request.resolver_match.url_name == 'payment_edit' or request.resolver_match.url_name == 'payment_delete' %}bg-purple-900/50 text-fpl-green border border-purple-700/60 shadow-sm{% else %}text-gray-300 hover:text-white hover:bg-purple-950/40{% endif %}" title="Treasurer Portal (Admin)">
+                    <div class="flex items-center">
+                        <i data-lucide="wallet" class="w-4 h-4 flex-shrink-0 text-emerald-400 group-hover:scale-110 transition-transform"></i>
+                        <span class="ml-3 sidebar-text whitespace-nowrap">Treasurer Portal</span>
+                    </div>
+                    {% if not is_treasury_unlocked %}
+                    <span class="sidebar-text text-[10px] bg-gray-800 text-gray-400 px-1.5 py-0.5 rounded border border-gray-700">🔒</span>
+                    {% endif %}
+                </a>
+
+            </nav>
+        </div>
+
+        <!-- Bottom Section: Next GW Deadline & Admin Status -->
+        <div class="p-3 border-t border-fpl-border/80 space-y-2.5">
+            
+            {% if current_gw or next_gw %}
+            <div class="sidebar-text p-2 rounded-xl bg-black/40 border border-gray-800/80 text-xs">
+                <div class="text-[10px] uppercase font-bold text-gray-400 tracking-wider">
+                    {% if next_gw %}{{ next_gw.name }}{% else %}{{ current_gw.name }}{% endif %} Deadline
+                </div>
+                <div class="text-white font-semibold mt-0.5 truncate text-[11px]">
+                    {% if next_gw %}{{ next_gw.deadline_eat|date:"D d M, H:i" }}{% else %}{{ current_gw.deadline_eat|date:"D d M, H:i" }}{% endif %} EAT
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Admin Status / Unlock Button -->
+            <div class="flex items-center justify-between p-2 rounded-xl bg-gray-900/80 border border-gray-800">
+                <div class="flex items-center space-x-2 overflow-hidden">
+                    <span class="text-xs">{% if is_treasury_unlocked %}🔓{% else %}🔒{% endif %}</span>
+                    <div class="sidebar-text">
+                        <span class="text-[11px] font-bold text-white block leading-tight">
+                            {% if is_treasury_unlocked %}Admin Active{% else %}Treasurer Locked{% endif %}
+                        </span>
+                    </div>
+                </div>
+
+                <div class="sidebar-text">
+                    {% if is_treasury_unlocked %}
+                    <a href="{% url 'treasury_lock' %}" class="px-2 py-0.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-[10px] font-bold rounded border border-gray-700 transition-colors">
+                        Lock
+                    </a>
+                    {% else %}
+                    <a href="{% url 'treasury_unlock' %}" class="px-2 py-0.5 bg-purple-900/80 hover:bg-purple-800 text-fpl-green text-[10px] font-bold rounded border border-purple-700 transition-colors">
+                        Unlock
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+
+            <a href="/admin/" target="_blank" class="sidebar-text flex items-center justify-center w-full py-1 text-[11px] font-medium text-gray-500 hover:text-gray-300 transition-colors">
+                <i data-lucide="shield" class="w-3 h-3 mr-1"></i> Django Admin
+            </a>
+        </div>
+
+    </aside>
+
+    <!-- Main Content Area -->
+    <div id="main-content" class="transition-all duration-300 main-expanded min-h-screen flex flex-col">
+        
+        <!-- Global Flash Messages -->
+        {% if messages %}
+        <div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 mt-3 w-full">
+            {% for message in messages %}
+            <div class="p-3 mb-2 rounded-xl border flex items-center justify-between text-xs sm:text-sm {% if message.tags == 'success' %}bg-emerald-950/80 border-emerald-700/80 text-emerald-200{% elif message.tags == 'error' %}bg-red-950/80 border-red-700/80 text-red-200{% else %}bg-purple-950/80 border-purple-700/80 text-purple-200{% endif %} shadow-md">
+                <div class="flex items-center space-x-2">
+                    {% if message.tags == 'success' %}
+                    <i data-lucide="check-circle" class="w-4 h-4 text-emerald-400 flex-shrink-0"></i>
+                    {% elif message.tags == 'error' %}
+                    <i data-lucide="alert-circle" class="w-4 h-4 text-red-400 flex-shrink-0"></i>
+                    {% else %}
+                    <i data-lucide="info" class="w-4 h-4 text-purple-400 flex-shrink-0"></i>
+                    {% endif %}
+                    <span>{{ message }}</span>
+                </div>
+                <button onclick="this.parentElement.remove()" class="text-gray-400 hover:text-white ml-3 p-1">
+                    <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                </button>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Main Page Content -->
+        <main class="flex-grow max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 w-full">
+            {% block content %}{% endblock %}
+        </main>
+
+        <!-- Footer -->
+        <footer class="bg-gray-900/40 border-t border-gray-800/60 py-4 text-xs text-gray-500 text-center">
+            <div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2">
+                <div class="flex items-center space-x-2">
+                    <span class="font-black text-fpl-green">FPL BOYS</span>
+                    <span>• Season 2026/27</span>
+                    <span class="text-gray-600">|</span>
+                    <span class="font-mono text-gray-400">ID: 1868934</span>
+                </div>
+                <div class="text-gray-400">
+                    Weekly Contribution: Ksh. 150/GW (BBQ: 50 | Jackpot: 50 | GW Prize: 50)
+                </div>
+            </div>
+        </footer>
+
+    </div>
+
+    <!-- Collapsible Sidebar Scripts -->
+    <script>
+        lucide.createIcons();
+
+        const sidebar = document.getElementById('sidebar');
+        const mainContent = document.getElementById('main-content');
+        const desktopToggle = document.getElementById('desktop-sidebar-toggle');
+        const toggleIcon = document.getElementById('toggle-icon');
+        const mobileToggle = document.getElementById('mobile-sidebar-toggle');
+        const mobileClose = document.getElementById('mobile-sidebar-close');
+        const mobileOverlay = document.getElementById('mobile-overlay');
+        const sidebarTexts = document.querySelectorAll('.sidebar-text');
+
+        // Check if on mobile initially
+        function syncMobileLayout() {
+            if (window.innerWidth < 768) {
+                mainContent.classList.remove('main-expanded', 'main-collapsed');
+                sidebarTexts.forEach(el => el.classList.remove('hidden'));
+            } else {
+                const savedCollapsed = localStorage.getItem('fpl_sidebar_collapsed') === 'true';
+                applyCollapsedState(savedCollapsed);
+            }
+        }
+
+        const isCollapsed = localStorage.getItem('fpl_sidebar_collapsed') === 'true';
+        if (isCollapsed && window.innerWidth >= 768) {
+            applyCollapsedState(true);
+        } else {
+            syncMobileLayout();
+        }
+
+        function applyCollapsedState(collapsed) {
+            if (collapsed) {
+                sidebar.classList.remove('sidebar-expanded');
+                sidebar.classList.add('sidebar-collapsed');
+                mainContent.classList.remove('main-expanded');
+                mainContent.classList.add('main-collapsed');
+                sidebarTexts.forEach(el => el.classList.add('hidden'));
+                if (toggleIcon) toggleIcon.setAttribute('data-lucide', 'chevron-right');
+            } else {
+                sidebar.classList.remove('sidebar-collapsed');
+                sidebar.classList.add('sidebar-expanded');
+                mainContent.classList.remove('main-collapsed');
+                mainContent.classList.add('main-expanded');
+                sidebarTexts.forEach(el => el.classList.remove('hidden'));
+                if (toggleIcon) toggleIcon.setAttribute('data-lucide', 'chevron-left');
+            }
+            lucide.createIcons();
+        }
+
+        if (desktopToggle) {
+            desktopToggle.addEventListener('click', () => {
+                const currentlyCollapsed = sidebar.classList.contains('sidebar-collapsed');
+                applyCollapsedState(!currentlyCollapsed);
+                localStorage.setItem('fpl_sidebar_collapsed', !currentlyCollapsed);
+            });
+        }
+
+        function openMobileSidebar() {
+            sidebar.classList.remove('-translate-x-full');
+            mobileOverlay.classList.remove('hidden');
+            document.body.classList.add('overflow-hidden');
+        }
+
+        function closeMobileSidebar() {
+            sidebar.classList.add('-translate-x-full');
+            mobileOverlay.classList.add('hidden');
+            document.body.classList.remove('overflow-hidden');
+        }
+
+        if (mobileToggle) mobileToggle.addEventListener('click', openMobileSidebar);
+        if (mobileClose) mobileClose.addEventListener('click', closeMobileSidebar);
+        if (mobileOverlay) mobileOverlay.addEventListener('click', closeMobileSidebar);
+
+        // Auto close mobile sidebar when any nav link is tapped
+        const navLinks = sidebar.querySelectorAll('nav a');
+        navLinks.forEach(link => {
+            link.addEventListener('click', () => {
+                if (window.innerWidth < 768) {
+                    closeMobileSidebar();
+                }
+            });
+        });
+
+        window.addEventListener('resize', syncMobileLayout);
+    </script>
+
+    {% block extra_js %}{% endblock %}
+</body>
+</html>
