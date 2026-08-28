@@ -17,16 +17,32 @@ from django.conf import settings
 
 def application(environ, start_response):
     """
-    Temporary WSGI helper to run collectstatic, migrations, and verify symlinks via browser.
+    Temporary WSGI helper to run git pull, migrations, collectstatic, and verify symlinks via browser.
     """
     logs = []
     
-    # 1. Run Migrations
+    # 1. Run Git Pull
+    try:
+        pull_cmd = subprocess.run(
+            ['git', 'pull', 'origin', 'main'],
+            cwd=str(BASE_DIR),
+            capture_output=True,
+            text=True,
+            timeout=25
+        )
+        out = (pull_cmd.stdout or "").strip()
+        err = (pull_cmd.stderr or "").strip()
+        logs.append(f"📦 Git Pull: {out} {err}".strip())
+    except Exception as e:
+        logs.append(f"⚠️ Git Pull notice: {e}")
+
+    # 2. Run Migrations
     try:
         call_command('migrate', interactive=False)
         logs.append("✅ Database migrations applied successfully.")
     except Exception as e:
         logs.append(f"❌ Migration error: {e}")
+
 
     # 2. Collect Static Files
     try:
