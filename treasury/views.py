@@ -9,14 +9,15 @@ import pytz
 
 from league.models import Member, Gameweek, GameweekResult
 from league.services.fpl_client import FPLSyncService
-from treasury.models import Payment, AuditLog, TreasuryConfig
+from treasury.models import Payment, AuditLog, TreasuryConfig, PrizePayout
 
 from treasury.forms import PaymentForm
 from treasury.services.ledger_matrix import build_financial_ledger_matrix
 
 from treasury.services.pot_calculator import get_treasury_summary, get_member_financial_leaderboard
 from treasury.decorators import treasury_admin_required
-from treasury.services.payment_allocation import process_bulk_payment_carryover, apply_winnings_to_future_gameweeks, get_member_available_prize_balance
+from treasury.services.payment_allocation import process_bulk_payment_carryover, apply_winnings_to_future_gameweeks, get_member_available_prize_balance, record_cash_payout
+
 
 
 
@@ -111,6 +112,29 @@ def treasurer_portal_view(request):
                 messages.error(request, f"FPL sync error: {e}")
             return redirect('treasurer_portal')
 
+        elif action == 'disburse_payout':
+            member_id = request.POST.get('member_id')
+            amount_str = request.POST.get('amount_to_disburse')
+            mpesa_ref = request.POST.get('mpesa_reference', '').strip().upper()
+            notes = request.POST.get('notes', '').strip()
+
+            try:
+                member = get_object_or_404(Member, pk=member_id)
+                amount = Decimal(amount_str)
+                payout = record_cash_payout(
+                    member=member,
+                    amount=amount,
+                    mpesa_reference=mpesa_ref,
+                    notes=notes
+                )
+                messages.success(
+                    request,
+                    f"💸 Recorded M-Pesa cash payout of Ksh. {amount:,.2f} to {member.manager_name}! (Ref: {mpesa_ref or 'N/A'})"
+                )
+            except Exception as e:
+                messages.error(request, f"Error recording cash payout: {e}")
+            return redirect('treasurer_portal')
+
         elif action == 'apply_winnings':
             # Manager using prize winnings to fund future gameweeks
             member_id = request.POST.get('member_id')
@@ -130,6 +154,7 @@ def treasurer_portal_view(request):
             except Exception as e:
                 messages.error(request, f"Error applying winnings: {e}")
             return redirect('treasurer_portal')
+
 
         elif action == 'save_payment':
             form = PaymentForm(request.POST)
@@ -203,25 +228,33 @@ def treasurer_portal_view(request):
     treasury = get_treasury_summary()
 
     # Members with their available prize balances
-    from treasury.services.payment_allocation import get_member_available_prize_balance
+    from treasury.services.payment_allocation import get_member_available_prize_balance, models_sum
+    prize_payouts = PrizePayout.objects.select_related('member', 'gameweek').order_by('-disbursed_at')[:20]
+
     members_winnings_list = []
     for m in members:
         avail = get_member_available_prize_balance(m)
+        cash_paid = PrizePayout.objects.filter(member=m, payout_method='MPESA_CASH').aggregate(total=models_sum('amount'))['total'] or Decimal('0.00')
+        reinvested = Payment.objects.filter(member=m, mpesa_code__icontains="PRIZE", verified=True).aggregate(total=models_sum('amount_paid'))['total'] or Decimal('0.00')
         members_winnings_list.append({
             'member': m,
             'available_winnings': avail,
             'total_won': m.total_prizes_won,
+            'cash_disbursed': cash_paid,
+            'reinvested': reinvested,
         })
 
     context = {
         'form': form,
         'all_payments': all_payments,
+        'prize_payouts': prize_payouts,
         'audit_logs': audit_logs,
         'treasury': treasury,
         'members_winnings_list': members_winnings_list,
         'all_gws': all_gws,
     }
     return render(request, 'treasury/portal.html', context)
+
 
 
 

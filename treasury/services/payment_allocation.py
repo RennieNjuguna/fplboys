@@ -79,18 +79,53 @@ def process_bulk_payment_carryover(member: Member, start_gw: Gameweek, total_amo
 
 def get_member_available_prize_balance(member: Member) -> Decimal:
     """
-    Computes a member's available prize winnings that haven't yet been converted to payments.
-    Available = Total Prizes Won - Total Amount Funded from Prizes in Payments.
+    Computes a member's available prize winnings that haven't yet been disbursed or converted to payments.
+    Available = Total Prizes Won - Cash Disbursed (M-Pesa) - Reinvested in Payments.
     """
+    from treasury.models import PrizePayout
     total_won = member.total_prizes_won
+    
+    cash_disbursed = PrizePayout.objects.filter(
+        member=member,
+        payout_method='MPESA_CASH'
+    ).aggregate(total=models_sum('amount'))['total'] or Decimal('0.00')
+
     reinvested = Payment.objects.filter(
         member=member,
         mpesa_code__icontains="PRIZE",
         verified=True
     ).aggregate(total=models_sum('amount_paid'))['total'] or Decimal('0.00')
 
-    available = total_won - reinvested
+    available = total_won - cash_disbursed - reinvested
     return max(Decimal('0.00'), available)
+
+
+def record_cash_payout(member: Member, amount: Decimal, gameweek=None, mpesa_reference=None, notes=None):
+    """
+    Records a cash prize payout sent directly to the winner via M-Pesa.
+    Deducts the amount from their available prize balance.
+    """
+    from treasury.models import PrizePayout, AuditLog
+    available = get_member_available_prize_balance(member)
+    if amount > available:
+        raise ValueError(f"Cannot disburse Ksh. {amount}. Only Ksh. {available} available in prize balance.")
+
+    payout = PrizePayout.objects.create(
+        member=member,
+        gameweek=gameweek,
+        amount=amount,
+        payout_method='MPESA_CASH',
+        mpesa_reference=mpesa_reference,
+        notes=notes or "Cash prize disbursed via M-Pesa",
+        disbursed_at=timezone.now()
+    )
+
+    AuditLog.objects.create(
+        action='PRIZE_DISBURSED',
+        description=f"Disbursed Ksh. {amount:,.2f} cash prize to {member.manager_name} via M-Pesa. Ref: {mpesa_reference or 'N/A'}",
+        performed_by='Treasurer'
+    )
+    return payout
 
 
 def models_sum(field_name):
@@ -99,6 +134,7 @@ def models_sum(field_name):
 
 
 def apply_winnings_to_future_gameweeks(member: Member, amount_to_apply: Decimal, start_gw_number=None) -> list:
+
     """
     Applies a manager's cash prize winnings to cater for future unpaid gameweeks.
     Marks contributions with 'PRIZE-WINNINGS' and clear notes.

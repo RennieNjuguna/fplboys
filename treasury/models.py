@@ -120,6 +120,33 @@ class Payment(models.Model):
 
 
 
+class PrizePayout(models.Model):
+    """
+    Tracks cash payouts and prize distributions disbursed to managers.
+    Ensures disbursed prize money is deducted from available rollover balances.
+    """
+    PAYOUT_METHOD_CHOICES = (
+        ('MPESA_CASH', 'M-Pesa Cash Disbursal'),
+        ('REINVESTED', 'Reinvested in Future GWs'),
+    )
+    member = models.ForeignKey(Member, on_delete=models.CASCADE, related_name='prize_payouts')
+    gameweek = models.ForeignKey(Gameweek, on_delete=models.SET_NULL, null=True, blank=True, related_name='prize_payouts')
+    amount = models.DecimalField(max_digits=10, decimal_places=2, help_text="Amount disbursed in Ksh.")
+    payout_method = models.CharField(max_length=20, choices=PAYOUT_METHOD_CHOICES, default='MPESA_CASH')
+    mpesa_reference = models.CharField(max_length=50, blank=True, null=True, help_text="Outgoing M-Pesa Transaction Ref (e.g. QLK983021LK)")
+    notes = models.TextField(blank=True, default="")
+    disbursed_at = models.DateTimeField(default=timezone.now)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-disbursed_at']
+        verbose_name = "Prize Payout"
+        verbose_name_plural = "Prize Payouts"
+
+    def __str__(self):
+        return f"{self.member.manager_name} - Ksh. {self.amount} ({self.payout_method})"
+
+
 class AuditLog(models.Model):
     """
     Log of treasury activities, syncs, reminders, and payment updates.
@@ -128,6 +155,7 @@ class AuditLog(models.Model):
         ('PAYMENT_CREATED', 'Payment Created'),
         ('PAYMENT_UPDATED', 'Payment Updated'),
         ('PAYMENT_DELETED', 'Payment Deleted'),
+        ('PRIZE_DISBURSED', 'Prize Disbursed via M-Pesa'),
         ('REMINDER_GENERATED', 'Reminder Generated'),
         ('FPL_SYNC', 'FPL Sync Performed'),
         ('PAYOUT_CALCULATED', 'Payout Calculated'),
@@ -146,3 +174,4 @@ class AuditLog(models.Model):
 
     def __str__(self):
         return f"[{self.created_at.strftime('%Y-%m-%d %H:%M')}] {self.action}: {self.description[:50]}"
+

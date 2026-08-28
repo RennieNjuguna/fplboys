@@ -107,28 +107,79 @@
                 </button>
             </form>
 
-            <!-- Prize Winnings to Future GWs Reinvestment Tool -->
-            <div class="mt-6 pt-5 border-t border-gray-800">
-                <div class="flex items-center space-x-2 pb-2 mb-3">
-                    <i data-lucide="trophy" class="w-4 h-4 text-amber-400"></i>
-                    <h3 class="text-xs font-bold text-white uppercase tracking-wider">Use Prize Winnings for Future GWs</h3>
+            <!-- Prize Winnings: Cash Payouts & Rollovers Tool -->
+            <div class="mt-6 pt-5 border-t border-gray-800 space-y-4">
+                <div class="flex items-center justify-between pb-2 border-b border-gray-800/80">
+                    <div class="flex items-center space-x-2">
+                        <i data-lucide="trophy" class="w-4 h-4 text-amber-400"></i>
+                        <h3 class="text-xs font-bold text-white uppercase tracking-wider">Prize Payouts & Rollovers</h3>
+                    </div>
                 </div>
-                <p class="text-[10px] text-gray-400 mb-3">
-                    Convert accumulated cash winnings into future GW contributions (Ksh. 150/GW).
-                </p>
 
-                <form method="POST" action="{% url 'treasurer_portal' %}" class="space-y-3">
+                <!-- Mode Switcher Buttons -->
+                <div class="grid grid-cols-2 gap-1.5 p-1 bg-gray-800/80 rounded-xl">
+                    <button type="button" onclick="switchPrizeMode('disburse')" id="btn-mode-disburse" class="py-1.5 px-2 text-[11px] font-bold rounded-lg transition-all bg-emerald-600 text-white shadow">
+                        💸 Disburse Cash (M-Pesa)
+                    </button>
+                    <button type="button" onclick="switchPrizeMode('rollover')" id="btn-mode-rollover" class="py-1.5 px-2 text-[11px] font-bold rounded-lg transition-all text-gray-400 hover:text-white">
+                        🔄 Roll Over to GWs
+                    </button>
+                </div>
+
+                <!-- Form 1: Cash Disbursal (M-Pesa Sent) -->
+                <form method="POST" action="{% url 'treasurer_portal' %}" class="space-y-3" id="form-disburse-payout">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="disburse_payout">
+
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-300 uppercase tracking-wider mb-1">Select Winner</label>
+                        <select name="member_id" id="payout-member-select" onchange="updatePayoutMax()" required class="bg-gray-800 border border-purple-700/60 text-white text-xs font-semibold rounded-xl focus:ring-fpl-green focus:border-fpl-green block w-full p-2.5">
+                            <option value="">-- Choose Winner --</option>
+                            {% for item in members_winnings_list %}
+                            {% if item.available_winnings > 0 %}
+                            <option value="{{ item.member.id }}" data-avail="{{ item.available_winnings }}">
+                                {{ item.member.manager_name }} (Avail: Ksh. {{ item.available_winnings|floatformat:0 }})
+                            </option>
+                            {% endif %}
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-300 uppercase tracking-wider mb-1">Amount to Disburse (Ksh.)</label>
+                        <input type="number" name="amount_to_disburse" id="payout-amount-input" step="0.01" value="250.00" min="1" required class="bg-gray-800 border border-purple-700/60 text-white text-xs font-mono font-bold rounded-xl focus:ring-fpl-green focus:border-fpl-green block w-full p-2.5">
+                    </div>
+
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-300 uppercase tracking-wider mb-1">Outgoing M-Pesa Ref Code</label>
+                        <input type="text" name="mpesa_reference" placeholder="e.g. QLH89201LK" class="bg-gray-800 border border-purple-700/60 text-white text-xs font-mono font-bold uppercase rounded-xl focus:ring-fpl-green focus:border-fpl-green block w-full p-2.5">
+                    </div>
+
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-300 uppercase tracking-wider mb-1">Notes (Optional)</label>
+                        <input type="text" name="notes" placeholder="e.g. Sent via M-Pesa to winner" class="bg-gray-800 border border-purple-700/60 text-white text-xs rounded-xl focus:ring-fpl-green focus:border-fpl-green block w-full p-2.5">
+                    </div>
+
+                    <button type="submit" class="w-full mt-1 py-2.5 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-lg transition-all flex items-center justify-center">
+                        <i data-lucide="send" class="w-4 h-4 mr-1.5"></i> Record Cash Disbursed
+                    </button>
+                </form>
+
+                <!-- Form 2: Rollover into Future GWs -->
+                <form method="POST" action="{% url 'treasurer_portal' %}" class="space-y-3 hidden" id="form-rollover-winnings">
                     {% csrf_token %}
                     <input type="hidden" name="action" value="apply_winnings">
 
                     <div>
                         <label class="block text-[10px] font-bold text-gray-300 uppercase tracking-wider mb-1">Select Winner</label>
                         <select name="member_id" id="winnings-member-select" onchange="updateAvailableWinnings()" required class="bg-gray-800 border border-purple-700/60 text-white text-xs font-semibold rounded-xl focus:ring-fpl-green focus:border-fpl-green block w-full p-2.5">
-                            <option value="">-- Choose Member --</option>
+                            <option value="">-- Choose Winner --</option>
                             {% for item in members_winnings_list %}
+                            {% if item.available_winnings > 0 %}
                             <option value="{{ item.member.id }}" data-avail="{{ item.available_winnings }}">
                                 {{ item.member.manager_name }} (Avail: Ksh. {{ item.available_winnings|floatformat:0 }})
                             </option>
+                            {% endif %}
                             {% endfor %}
                         </select>
                     </div>
@@ -154,6 +205,7 @@
                 </form>
             </div>
         </div>
+
 
 
         <!-- Right 2 Columns: Full Payments Management Table (CRUD Actions) -->
@@ -233,6 +285,55 @@
                 </div>
             </div>
 
+            <!-- Prize Disbursements (M-Pesa Cash Payouts) History Table -->
+            <div class="bg-gray-900 border border-gray-800 rounded-3xl shadow-xl overflow-hidden">
+                <div class="bg-gradient-to-r from-emerald-950/60 to-gray-900 px-6 py-4 border-b border-gray-800 flex items-center justify-between">
+                    <h2 class="text-sm font-bold text-white flex items-center">
+                        <i data-lucide="send" class="w-4 h-4 mr-2 text-emerald-400"></i> Cash Prize Disbursements ({{ prize_payouts.count }})
+                    </h2>
+                    <span class="text-xs text-gray-400 font-mono">Cleared from Rollover</span>
+                </div>
+
+                <div class="overflow-x-auto max-h-72" style="-webkit-overflow-scrolling: touch;">
+                    <table class="w-full text-xs text-left text-gray-300">
+                        <thead class="sticky top-0 bg-gray-850 uppercase text-gray-400 font-bold border-b border-gray-800 z-10">
+                            <tr>
+                                <th class="px-4 py-3">Winner</th>
+                                <th class="px-4 py-3 text-center">Amount Disbursed</th>
+                                <th class="px-4 py-3">M-Pesa Ref</th>
+                                <th class="px-4 py-3">Notes</th>
+                                <th class="px-4 py-3 text-right">Time (GMT+3)</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-800 font-mono">
+                            {% for p in prize_payouts %}
+                            <tr class="hover:bg-emerald-950/20 font-sans">
+                                <td class="px-4 py-3 font-bold text-white">
+                                    {{ p.member.manager_name }}
+                                </td>
+                                <td class="px-4 py-3 text-center font-mono font-black text-emerald-400">
+                                    Ksh. {{ p.amount|floatformat:2 }}
+                                </td>
+                                <td class="px-4 py-3 font-mono text-emerald-300 font-bold">
+                                    {{ p.mpesa_reference|default:"-" }}
+                                </td>
+                                <td class="px-4 py-3 text-gray-400 text-[11px] truncate max-w-[150px]">
+                                    {{ p.notes|default:"Cash prize sent" }}
+                                </td>
+                                <td class="px-4 py-3 text-right font-mono text-gray-400 text-[11px]">
+                                    {{ p.disbursed_at|date:"d M, H:i" }} EAT
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="5" class="text-center py-6 text-gray-500 font-sans">No cash payouts disbursed yet.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
             <!-- Treasury Audit Logs -->
             <div class="bg-gray-900 border border-gray-800 rounded-3xl p-5 shadow-xl">
                 <h3 class="text-xs font-bold text-white uppercase tracking-wider flex items-center pb-3 border-b border-gray-800 mb-3">
@@ -253,6 +354,7 @@
                     {% endfor %}
                 </div>
             </div>
+
 
 
         </div>
@@ -296,6 +398,39 @@
         }
     }
 
+    function switchPrizeMode(mode) {
+        const formDisburse = document.getElementById('form-disburse-payout');
+        const formRollover = document.getElementById('form-rollover-winnings');
+        const btnDisburse = document.getElementById('btn-mode-disburse');
+        const btnRollover = document.getElementById('btn-mode-rollover');
+
+        if (mode === 'disburse') {
+            formDisburse.classList.remove('hidden');
+            formRollover.classList.add('hidden');
+            btnDisburse.className = 'py-1.5 px-2 text-[11px] font-bold rounded-lg transition-all bg-emerald-600 text-white shadow';
+            btnRollover.className = 'py-1.5 px-2 text-[11px] font-bold rounded-lg transition-all text-gray-400 hover:text-white';
+        } else {
+            formDisburse.classList.add('hidden');
+            formRollover.classList.remove('hidden');
+            btnRollover.className = 'py-1.5 px-2 text-[11px] font-bold rounded-lg transition-all bg-amber-600 text-white shadow';
+            btnDisburse.className = 'py-1.5 px-2 text-[11px] font-bold rounded-lg transition-all text-gray-400 hover:text-white';
+        }
+    }
+
+    function updatePayoutMax() {
+        const select = document.getElementById('payout-member-select');
+        const amountInput = document.getElementById('payout-amount-input');
+        if (!select || !amountInput) return;
+        const selectedOpt = select.options[select.selectedIndex];
+        const avail = parseFloat(selectedOpt.getAttribute('data-avail') || '0');
+        if (avail > 0) {
+            amountInput.max = avail;
+            amountInput.value = avail.toFixed(2);
+        } else {
+            amountInput.value = '0.00';
+        }
+    }
+
     function updateAvailableWinnings() {
         const select = document.getElementById('winnings-member-select');
         const amountInput = document.getElementById('winnings-amount-input');
@@ -312,7 +447,12 @@
 
     if (gwSelect) gwSelect.addEventListener('change', checkDeadline);
     if (timeInput) timeInput.addEventListener('change', checkDeadline);
-    document.addEventListener('DOMContentLoaded', checkDeadline);
+    document.addEventListener('DOMContentLoaded', function() {
+        checkDeadline();
+        updatePayoutMax();
+        updateAvailableWinnings();
+    });
 </script>
+
 
 {% endblock %}

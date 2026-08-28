@@ -319,5 +319,36 @@ class TreasuryFinancialTests(TestCase):
         self.assertEqual(p3.amount_paid, Decimal('150.00'))
         self.assertEqual(p4.amount_paid, Decimal('150.00'))
 
+    def test_record_cash_payout_deduction(self):
+        """Recording a cash prize payout (M-Pesa sent) clears the member's available rollover balance"""
+        from treasury.services.payment_allocation import get_member_available_prize_balance
+        # Member 1 wins 250 in GW 1
+        GameweekResult.objects.create(
+            member=self.m1,
+            gameweek=self.gw1,
+            gw_points=90,
+            transfer_cost=0,
+            gw_prize_won=Decimal('250.00'),
+            league_rank=1,
+            is_top3=True
+        )
+        self.assertEqual(get_member_available_prize_balance(self.m1), Decimal('250.00'))
+
+        self.client.post('/treasury/unlock/', {'password': '@FPLBoyz254??', 'next': '/treasury/portal/'})
+
+        # Disburse cash via portal
+        resp = self.client.post('/treasury/portal/', {
+            'action': 'disburse_payout',
+            'member_id': self.m1.id,
+            'amount_to_disburse': '250.00',
+            'mpesa_reference': 'MPESA250REF',
+            'notes': 'Sent cash via M-Pesa to winner',
+        })
+        self.assertEqual(resp.status_code, 302)
+
+        # Available balance is now 0
+        self.assertEqual(get_member_available_prize_balance(self.m1), Decimal('0.00'))
+
+
 
 
