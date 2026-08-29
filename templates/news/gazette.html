@@ -15,11 +15,10 @@
                 📰
             </div>
             <div class="min-w-0">
-                <h1 class="text-base sm:text-xl font-black text-white font-serif tracking-wide flex items-center gap-2 truncate">
-                    <span>THE FPL BOYZ GAZETTE</span>
-                    <span class="text-[9px] sm:text-[10px] bg-red-950 text-red-400 border border-red-800 px-1.5 sm:px-2 py-0.5 rounded-full font-sans font-bold uppercase tracking-wider shrink-0 animate-pulse">POST-GW EDITION</span>
+                <h1 class="text-base sm:text-xl font-black text-white font-serif tracking-wide">
+                    THE FPL BOYZ GAZETTE
                 </h1>
-                <p class="text-[11px] sm:text-xs text-gray-400 truncate">
+                <p class="text-[11px] sm:text-xs text-gray-400">
                     Official weekly broadsheet, match autopsies, and banter.
                 </p>
             </div>
@@ -87,23 +86,23 @@
                 THE FPL BOYZ GAZETTE
             </h1>
 
-            <!-- Masthead Sub-bar (Responsive Flex/Grid) -->
-            <div class="flex flex-wrap items-center justify-between gap-1 text-[9px] sm:text-xs font-sans border-t-2 border-b-2 border-gray-900 dark:border-gray-300 py-1 font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                <span>📅 {{ selected_edition.publish_date|date:"D, d M Y" }}</span>
-                <span class="hidden xs:inline">💰 Entry: Ksh. 150</span>
-                <span>📍 Nairobi Bureau</span>
-                <span class="truncate max-w-[150px] sm:max-w-none">⛅ {{ selected_edition.weather_report }}</span>
+            <!-- Masthead Sub-bar (Clean responsive grid) -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[9px] sm:text-xs font-sans border-t-2 border-b-2 border-gray-900 dark:border-gray-300 py-1.5 font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 text-center sm:text-left">
+                <div>📅 {{ selected_edition.publish_date|date:"D, d M Y" }}</div>
+                <div>💰 Entry: Ksh. 150</div>
+                <div>📍 Nairobi Bureau</div>
+                <div class="col-span-2 sm:col-span-1 text-left sm:text-right">⛅ {{ selected_edition.weather_report }}</div>
             </div>
 
         </div>
 
-        <!-- Breaking Headline Banner -->
-        <div class="bg-red-600 text-white font-sans text-xs font-bold px-3 py-2 rounded-lg flex items-center justify-between shadow-sm">
-            <div class="flex items-center space-x-2 min-w-0">
-                <span class="bg-black text-red-400 px-1.5 py-0.5 rounded text-[9px] uppercase font-black tracking-widest shrink-0">TOP WIRE</span>
-                <span class="truncate text-[11px] sm:text-xs">{{ selected_edition.headline }}</span>
+        <!-- Breaking Headline Banner (Fully Readable & Wrapped on Mobile) -->
+        <div class="bg-red-600 text-white font-sans text-xs font-bold p-2.5 sm:px-3.5 sm:py-2 rounded-xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 sm:gap-2 shadow-md">
+            <div class="flex items-start sm:items-center space-x-2">
+                <span class="bg-black text-red-400 px-1.5 py-0.5 rounded text-[9px] uppercase font-black tracking-widest shrink-0 mt-0.5 sm:mt-0">TOP WIRE</span>
+                <span class="text-[11px] sm:text-xs font-bold leading-snug break-words">{{ selected_edition.headline }}</span>
             </div>
-            <span class="hidden sm:inline text-[10px] uppercase tracking-wider text-red-200 shrink-0 ml-2">GW {{ selected_edition.gameweek.number }} Review</span>
+            <span class="hidden md:inline text-[10px] uppercase tracking-wider text-red-200 shrink-0">GW {{ selected_edition.gameweek.number }} Review</span>
         </div>
 
         <!-- FRONT PAGE LEAD STORY & SPOTLIGHT -->
