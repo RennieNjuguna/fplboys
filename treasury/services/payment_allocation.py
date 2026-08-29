@@ -1,80 +1,13 @@
 from decimal import Decimal
 from django.db import transaction
+from django.db.models import Sum
 from django.utils import timezone
 from league.models import Member, Gameweek
-from treasury.models import Payment, AuditLog
+from treasury.models import Payment, AuditLog, PrizePayout
 
 
-def process_bulk_payment_carryover(member: Member, start_gw: Gameweek, total_amount: Decimal, timestamp=None, mpesa_code=None, notes=None) -> list:
-    """
-    Processes a lump-sum payment (e.g., Ksh. 300, 600, 1500) and automatically distributes it
-    in Ksh. 150 increments to the starting gameweek and subsequent unpaid gameweeks in sequential order.
-    Returns the list of created / updated Payment records.
-    """
-    if timestamp is None:
-        timestamp = timezone.now()
-
-    created_payments = []
-    remaining_balance = Decimal(str(total_amount))
-    standard_rate = Decimal('150.00')
-
-    # Get future gameweeks starting from start_gw.number
-    all_future_gws = list(Gameweek.objects.filter(number__gte=start_gw.number).order_by('number'))
-
-    with transaction.atomic():
-        for gw in all_future_gws:
-            if remaining_balance <= Decimal('0.00'):
-                break
-
-            existing_payment = Payment.objects.filter(member=member, gameweek=gw).first()
-            if existing_payment and existing_payment.amount_paid >= standard_rate:
-                continue  # Already fully paid for this gameweek, proceed to next
-
-            current_paid = existing_payment.amount_paid if existing_payment else Decimal('0.00')
-            needed = standard_rate - current_paid
-            allocating = min(remaining_balance, needed)
-
-            if existing_payment:
-                existing_payment.amount_paid += allocating
-                if mpesa_code:
-                    existing_payment.mpesa_code = mpesa_code
-                if timestamp:
-                    existing_payment.timestamp_received = timestamp
-                existing_payment.verified = True
-                if notes:
-                    existing_payment.notes = f"{existing_payment.notes}; {notes}".strip('; ')
-                existing_payment.save()
-                created_payments.append(existing_payment)
-            else:
-                is_first = (gw == start_gw)
-                ref_suffix = f" (Carryover)" if not is_first and mpesa_code else ""
-                custom_notes = notes or (f"Lump sum payment for GW {start_gw.number}" if is_first else f"Auto carryover from GW {start_gw.number} payment")
-                
-                new_payment = Payment.objects.create(
-                    member=member,
-                    gameweek=gw,
-                    amount_paid=allocating,
-                    timestamp_received=timestamp,
-                    mpesa_code=f"{mpesa_code}{ref_suffix}" if mpesa_code else None,
-                    verified=True,
-                    notes=custom_notes
-                )
-                created_payments.append(new_payment)
-
-            remaining_balance -= allocating
-
-        if remaining_balance > Decimal('0.00') and created_payments:
-            last_p = created_payments[-1]
-            last_p.amount_paid += remaining_balance
-            last_p.save()
-
-        AuditLog.objects.create(
-            action='PAYMENT_CREATED',
-            description=f"Processed payment of Ksh. {total_amount} for {member.manager_name}. Distributed across {len(created_payments)} gameweeks starting GW {start_gw.number}.",
-            performed_by='Treasurer'
-        )
-
-    return created_payments
+def models_sum(field_name):
+    return Sum(field_name)
 
 
 def get_member_available_prize_balance(member: Member) -> Decimal:
@@ -82,21 +15,27 @@ def get_member_available_prize_balance(member: Member) -> Decimal:
     Computes a member's available prize winnings that haven't yet been disbursed or converted to payments.
     Available = Total Prizes Won - Cash Disbursed (M-Pesa) - Reinvested in Payments.
     """
-    from treasury.models import PrizePayout
     total_won = member.total_prizes_won
-    
+
     cash_disbursed = PrizePayout.objects.filter(
         member=member,
         payout_method='MPESA_CASH'
-    ).aggregate(total=models_sum('amount'))['total'] or Decimal('0.00')
+    ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
 
-    reinvested = Payment.objects.filter(
+    reinvested_payouts = PrizePayout.objects.filter(
+        member=member,
+        payout_method='REINVESTED'
+    ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+
+    # Fallback for any legacy prize payments that lack PrizePayout records
+    legacy_reinvested = Payment.objects.filter(
         member=member,
         mpesa_code__icontains="PRIZE",
         verified=True
-    ).aggregate(total=models_sum('amount_paid'))['total'] or Decimal('0.00')
+    ).aggregate(total=Sum('amount_paid'))['total'] or Decimal('0.00')
 
-    available = total_won - cash_disbursed - reinvested
+    total_reinvested = max(reinvested_payouts, legacy_reinvested)
+    available = total_won - cash_disbursed - total_reinvested
     return max(Decimal('0.00'), available)
 
 
@@ -105,7 +44,6 @@ def record_cash_payout(member: Member, amount: Decimal, gameweek=None, mpesa_ref
     Records a cash prize payout sent directly to the winner via M-Pesa.
     Deducts the amount from their available prize balance.
     """
-    from treasury.models import PrizePayout, AuditLog
     available = get_member_available_prize_balance(member)
     if amount > available:
         raise ValueError(f"Cannot disburse Ksh. {amount}. Only Ksh. {available} available in prize balance.")
@@ -128,72 +66,170 @@ def record_cash_payout(member: Member, amount: Decimal, gameweek=None, mpesa_ref
     return payout
 
 
-def models_sum(field_name):
-    from django.db.models import Sum
-    return Sum(field_name)
-
-
-def apply_winnings_to_future_gameweeks(member: Member, amount_to_apply: Decimal, start_gw_number=None) -> list:
-
+def allocate_payment_with_rollover(
+    member: Member,
+    start_gw: Gameweek = None,
+    total_amount: Decimal = Decimal('150.00'),
+    timestamp=None,
+    mpesa_code: str = None,
+    notes: str = None,
+    verified: bool = True,
+    is_prize: bool = False
+) -> list:
     """
-    Applies a manager's cash prize winnings to cater for future unpaid gameweeks.
-    Marks contributions with 'PRIZE-WINNINGS' and clear notes.
+    Unified payment and prize rollover allocation engine:
+    1. Distributes funds starting at start_gw in increments up to standard Ksh. 150.00 per GW.
+    2. Correctly adds to existing partial payments (e.g. 83.33 + 66.67 = 150.00) without overwriting.
+    3. Automatically cascades any excess funds (> 150.00 or balance excess) forward to subsequent unpaid/partially paid GWs.
+    4. Guarantees no single GW payment exceeds Ksh. 150.00 standard contribution.
+    5. Preserves prize and M-Pesa reference audit trails.
     """
-    available = get_member_available_prize_balance(member)
-    if amount_to_apply > available:
-        raise ValueError(f"Cannot apply Ksh. {amount_to_apply}. Only Ksh. {available} available in prize winnings.")
+    if timestamp is None:
+        timestamp = timezone.now()
 
+    remaining_balance = Decimal(str(total_amount))
     standard_rate = Decimal('150.00')
-    remaining = Decimal(str(amount_to_apply))
     created_payments = []
 
-    # Filter unpaid gameweeks
+    # Query candidate gameweeks starting from start_gw.number (or 1)
     query = Gameweek.objects.all().order_by('number')
-    if start_gw_number:
-        query = query.filter(number__gte=start_gw_number)
+    if start_gw:
+        query = query.filter(number__gte=start_gw.number)
 
     candidate_gws = list(query)
 
     with transaction.atomic():
         for gw in candidate_gws:
-            if remaining <= Decimal('0.00'):
+            if remaining_balance <= Decimal('0.00'):
                 break
 
             existing_payment = Payment.objects.filter(member=member, gameweek=gw).first()
-            if existing_payment and existing_payment.amount_paid >= standard_rate:
-                continue
-
             current_paid = existing_payment.amount_paid if existing_payment else Decimal('0.00')
+
+            if current_paid >= standard_rate:
+                continue  # Already fully paid, rollover to next GW
+
             needed = standard_rate - current_paid
-            allocating = min(remaining, needed)
+            allocating = min(remaining_balance, needed)
+            if allocating <= Decimal('0.00'):
+                continue
 
             if existing_payment:
                 existing_payment.amount_paid += allocating
-                existing_payment.mpesa_code = "PRIZE-WINNINGS"
-                existing_payment.notes = f"{existing_payment.notes}; Topped up from prize winnings".strip('; ')
-                existing_payment.verified = True
+                if existing_payment.amount_paid > standard_rate:
+                    existing_payment.amount_paid = standard_rate
+
+                if timestamp:
+                    existing_payment.timestamp_received = timestamp
+
+                if is_prize:
+                    if not existing_payment.mpesa_code:
+                        existing_payment.mpesa_code = "PRIZE-WINNINGS"
+                    elif "PRIZE" not in existing_payment.mpesa_code:
+                        existing_payment.mpesa_code = f"{existing_payment.mpesa_code} / PRIZE"
+                else:
+                    if mpesa_code:
+                        if existing_payment.mpesa_code and "PRIZE" in existing_payment.mpesa_code:
+                            if mpesa_code not in existing_payment.mpesa_code:
+                                existing_payment.mpesa_code = f"PRIZE / {mpesa_code}"
+                        elif existing_payment.mpesa_code and mpesa_code not in existing_payment.mpesa_code:
+                            existing_payment.mpesa_code = f"{existing_payment.mpesa_code}, {mpesa_code}"
+                        else:
+                            existing_payment.mpesa_code = mpesa_code
+
+                if notes:
+                    existing_payment.notes = f"{existing_payment.notes}; {notes}".strip('; ')
+
+                existing_payment.verified = verified
                 existing_payment.save()
                 created_payments.append(existing_payment)
             else:
+                is_first = (start_gw is not None and gw.number == start_gw.number)
+                if is_prize:
+                    ref_code = "PRIZE-WINNINGS"
+                    custom_notes = notes or f"Funded via tournament prize winnings"
+                else:
+                    ref_suffix = " (Carryover)" if not is_first and mpesa_code else ""
+                    ref_code = f"{mpesa_code}{ref_suffix}" if mpesa_code else None
+                    custom_notes = notes or (f"Lump sum payment for GW {start_gw.number}" if (start_gw and is_first) else f"Auto carryover payment")
+
                 new_payment = Payment.objects.create(
                     member=member,
                     gameweek=gw,
                     amount_paid=allocating,
-                    timestamp_received=timezone.now(),
-                    mpesa_code="PRIZE-WINNINGS",
-                    is_late=False,
-                    late_fine_amount=Decimal('0.00'),
-                    verified=True,
-                    notes=f"Funded via tournament prize winnings"
+                    timestamp_received=timestamp,
+                    mpesa_code=ref_code,
+                    verified=verified,
+                    notes=custom_notes
                 )
                 created_payments.append(new_payment)
 
-            remaining -= allocating
+            if is_prize:
+                PrizePayout.objects.create(
+                    member=member,
+                    gameweek=gw,
+                    amount=allocating,
+                    payout_method='REINVESTED',
+                    notes=f"Reinvested prize into GW {gw.number} contribution",
+                    disbursed_at=timestamp
+                )
 
+            remaining_balance -= allocating
+
+        source_desc = "prize winnings" if is_prize else f"payment of Ksh. {total_amount}"
+        start_gw_num = start_gw.number if start_gw else (candidate_gws[0].number if candidate_gws else 1)
         AuditLog.objects.create(
             action='PAYMENT_CREATED',
-            description=f"Applied Ksh. {amount_to_apply} from prize winnings for {member.manager_name} to fund {len(created_payments)} gameweeks.",
+            description=f"Processed {source_desc} for {member.manager_name}. Allocated Ksh. {total_amount - remaining_balance:,.2f} across {len(created_payments)} gameweeks starting GW {start_gw_num}.",
             performed_by='Treasurer'
         )
 
     return created_payments
+
+
+def process_bulk_payment_carryover(member: Member, start_gw: Gameweek, total_amount: Decimal, timestamp=None, mpesa_code=None, notes=None) -> list:
+    """
+    Processes a lump-sum or rollover payment (e.g., Ksh. 300, 600, 1500) and automatically distributes it
+    in Ksh. 150 increments to the starting gameweek and subsequent unpaid gameweeks in sequential order.
+    Returns the list of created / updated Payment records.
+    """
+    return allocate_payment_with_rollover(
+        member=member,
+        start_gw=start_gw,
+        total_amount=total_amount,
+        timestamp=timestamp,
+        mpesa_code=mpesa_code,
+        notes=notes,
+        verified=True,
+        is_prize=False
+    )
+
+
+def apply_winnings_to_future_gameweeks(member: Member, amount_to_apply: Decimal, start_gw_number=None) -> list:
+    """
+    Applies a manager's cash prize winnings to cater for future unpaid gameweeks.
+    Marks contributions with 'PRIZE-WINNINGS' and tracks reinvestments in PrizePayout.
+    """
+    available = get_member_available_prize_balance(member)
+    if amount_to_apply > available:
+        raise ValueError(f"Cannot apply Ksh. {amount_to_apply}. Only Ksh. {available} available in prize winnings.")
+
+    start_gw = None
+    if start_gw_number:
+        start_gw = Gameweek.objects.filter(number=start_gw_number).first()
+    else:
+        # Find earliest unpaid/partial GW
+        standard_rate = Decimal('150.00')
+        for gw in Gameweek.objects.all().order_by('number'):
+            p = Payment.objects.filter(member=member, gameweek=gw).first()
+            if not p or p.amount_paid < standard_rate:
+                start_gw = gw
+                break
+
+    return allocate_payment_with_rollover(
+        member=member,
+        start_gw=start_gw,
+        total_amount=amount_to_apply,
+        verified=True,
+        is_prize=True
+    )

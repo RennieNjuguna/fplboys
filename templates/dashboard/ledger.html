@@ -154,6 +154,11 @@
                                 <div class="text-[8px] text-rose-300/90 font-semibold" title="Partial contribution. Balance remaining: Ksh. {{ cell.balance_due|floatformat:0 }}">
                                     Bal: {{ cell.balance_due|floatformat:0 }}
                                 </div>
+                                {% if 'PRIZE' in cell.mpesa_code|default:'' %}
+                                <div class="text-[8px] text-purple-300 font-semibold tracking-tight" title="Partially paid using reinvested prize winnings">From Pot</div>
+                                {% elif 'Carryover' in cell.mpesa_code|default:'' %}
+                                <div class="text-[8px] text-cyan-300 font-semibold tracking-tight" title="Paid via advance rollover">Advance</div>
+                                {% endif %}
 
                                 {% elif cell.status == 'LATE' %}
                                 <div class="font-bold text-[10px] sm:text-[11px] text-amber-300">

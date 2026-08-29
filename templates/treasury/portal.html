@@ -366,6 +366,7 @@
 
 {% block extra_js %}
 <script>
+    const memberSelect = document.getElementById('id_member');
     const gwSelect = document.getElementById('id_gameweek');
     const timeInput = document.getElementById('id_timestamp_received');
     const amountInput = document.getElementById('id_amount_paid');
@@ -375,22 +376,28 @@
     async function checkDeadline() {
         if (!gwSelect || !gwSelect.value) return;
         const gwId = gwSelect.value;
+        const memberId = memberSelect ? memberSelect.value : '';
         const timeVal = timeInput ? timeInput.value : '';
 
         try {
-            const resp = await fetch(`{% url "api_check_deadline" %}?gw_id=${gwId}&timestamp=${encodeURIComponent(timeVal)}`);
+            const resp = await fetch(`{% url "api_check_deadline" %}?gw_id=${gwId}&member_id=${memberId}&timestamp=${encodeURIComponent(timeVal)}`);
             const data = await resp.json();
 
             statusText.innerText = data.message;
-            if (data.is_late) {
+            if (data.has_existing && data.balance_due > 0) {
+                statusBox.className = 'p-2.5 rounded-xl border text-xs font-medium bg-amber-950/70 border-amber-600 text-amber-200 transition-all';
+                if (amountInput) {
+                    amountInput.value = data.recommended_amount.toFixed(2);
+                }
+            } else if (data.is_late) {
                 statusBox.className = 'p-2.5 rounded-xl border text-xs font-medium bg-amber-950/70 border-amber-700 text-amber-200 transition-all';
                 if (amountInput && (amountInput.value === '150.00' || amountInput.value === '150' || !amountInput.value)) {
                     amountInput.value = '200.00';
                 }
             } else {
                 statusBox.className = 'p-2.5 rounded-xl border text-xs font-medium bg-emerald-950/70 border-emerald-700 text-emerald-200 transition-all';
-                if (amountInput && (amountInput.value === '200.00' || amountInput.value === '200')) {
-                    amountInput.value = '150.00';
+                if (amountInput && (amountInput.value === '200.00' || amountInput.value === '200' || !amountInput.value)) {
+                    amountInput.value = data.recommended_amount.toFixed(2);
                 }
             }
         } catch (e) {
@@ -445,6 +452,7 @@
         }
     }
 
+    if (memberSelect) memberSelect.addEventListener('change', checkDeadline);
     if (gwSelect) gwSelect.addEventListener('change', checkDeadline);
     if (timeInput) timeInput.addEventListener('change', checkDeadline);
     document.addEventListener('DOMContentLoaded', function() {

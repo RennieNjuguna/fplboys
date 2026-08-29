@@ -204,7 +204,7 @@ class TreasuryFinancialTests(TestCase):
         resp_edit_post = self.client.post(edit_url, {
             'member': self.m1.id,
             'gameweek': self.gw3.id,
-            'amount_paid': '175.00',
+            'amount_paid': '120.00',
             'timestamp_received': (self.deadline - timedelta(hours=1)).strftime('%Y-%m-%dT%H:%M'),
             'mpesa_code': 'UPDATEDREF',
             'verified': True,
@@ -212,7 +212,7 @@ class TreasuryFinancialTests(TestCase):
         })
         self.assertEqual(resp_edit_post.status_code, 302)
         p.refresh_from_db()
-        self.assertEqual(p.amount_paid, Decimal('175.00'))
+        self.assertEqual(p.amount_paid, Decimal('120.00'))
         self.assertEqual(p.mpesa_code, 'UPDATEDREF')
 
         # Delete payment
@@ -348,6 +348,175 @@ class TreasuryFinancialTests(TestCase):
 
         # Available balance is now 0
         self.assertEqual(get_member_available_prize_balance(self.m1), Decimal('0.00'))
+
+    def test_partial_payment_top_up_after_prize_rollover(self):
+        """
+        Manager wins Ksh. 83.33 in GW1 -> rolls over to GW2 (amount_paid=83.33).
+        When treasurer logs remaining Ksh. 66.67, GW2 reaches 150.00 (PAID) and prize balance remains 0.
+        """
+        from treasury.services.payment_allocation import get_member_available_prize_balance, apply_winnings_to_future_gameweeks
+        GameweekResult.objects.create(
+            member=self.m1,
+            gameweek=self.gw1,
+            gw_points=80,
+            transfer_cost=0,
+            gw_prize_won=Decimal('83.33'),
+            league_rank=3,
+            is_top3=True
+        )
+        self.assertEqual(get_member_available_prize_balance(self.m1), Decimal('83.33'))
+
+        # Roll over 83.33 to GW2
+        apply_winnings_to_future_gameweeks(self.m1, Decimal('83.33'), start_gw_number=2)
+        p_gw2 = Payment.objects.get(member=self.m1, gameweek=self.gw2)
+        self.assertEqual(p_gw2.amount_paid, Decimal('83.33'))
+        self.assertEqual(get_member_available_prize_balance(self.m1), Decimal('0.00'))
+
+        # Now member pays the remaining balance of Ksh. 66.67 via portal
+        self.client.post('/treasury/unlock/', {'password': '@FPLBoyz254??', 'next': '/treasury/portal/'})
+        resp = self.client.post('/treasury/portal/', {
+            'action': 'save_payment',
+            'member': self.m1.id,
+            'gameweek': self.gw2.id,
+            'amount_paid': '66.67',
+            'timestamp_received': timezone.now().strftime('%Y-%m-%dT%H:%M'),
+            'mpesa_code': 'CASH66REF',
+            'verified': True,
+        })
+        self.assertEqual(resp.status_code, 302)
+
+        p_gw2.refresh_from_db()
+        self.assertEqual(p_gw2.amount_paid, Decimal('150.00'))
+        self.assertIn('PRIZE', p_gw2.mpesa_code)
+        self.assertIn('CASH66REF', p_gw2.mpesa_code)
+
+        # Available prize balance is STILL 0.00 (not corrupted or double counted)
+        self.assertEqual(get_member_available_prize_balance(self.m1), Decimal('0.00'))
+
+        # Financial ledger matrix confirms GW2 status is PAID
+        matrix = build_financial_ledger_matrix(max_gws=3)
+        row_m1 = next(r for r in matrix['rows'] if r['member'] == self.m1)
+        cell_gw2 = next(c for c in row_m1['cells'] if c['gw_id'] == self.gw2.id)
+        self.assertEqual(cell_gw2['status'], 'PAID')
+        self.assertEqual(cell_gw2['amount_paid'], Decimal('150.00'))
+        self.assertEqual(cell_gw2['balance_due'], Decimal('0.00'))
+
+    def test_partial_payment_with_excess_rollover(self):
+        """
+        Manager has partial contribution of Ksh. 100 in GW2.
+        When member pays standard Ksh. 150.00, GW2 receives Ksh. 50 (reaching 150) and GW3 receives Ksh. 100.
+        """
+        Payment.objects.create(
+            member=self.m2,
+            gameweek=self.gw2,
+            amount_paid=Decimal('100.00'),
+            timestamp_received=timezone.now(),
+            mpesa_code='PRIZE-WINNINGS',
+            verified=True
+        )
+
+        self.client.post('/treasury/unlock/', {'password': '@FPLBoyz254??', 'next': '/treasury/portal/'})
+        resp = self.client.post('/treasury/portal/', {
+            'action': 'save_payment',
+            'member': self.m2.id,
+            'gameweek': self.gw2.id,
+            'amount_paid': '150.00',
+            'timestamp_received': timezone.now().strftime('%Y-%m-%dT%H:%M'),
+            'mpesa_code': 'EXCESS150REF',
+            'verified': True,
+        })
+        self.assertEqual(resp.status_code, 302)
+
+        p2 = Payment.objects.get(member=self.m2, gameweek=self.gw2)
+        p3 = Payment.objects.get(member=self.m2, gameweek=self.gw3)
+
+        self.assertEqual(p2.amount_paid, Decimal('150.00'))
+        self.assertEqual(p3.amount_paid, Decimal('100.00'))
+
+    def test_excess_payment_never_exceeds_150_per_gw(self):
+        """
+        Paying Ksh. 500 across empty GWs caps each GW at 150 and rolls over excess.
+        """
+        gw4 = Gameweek.objects.create(number=4, name="Gameweek 4", deadline_time=self.deadline + timedelta(days=7), status='upcoming')
+        self.client.post('/treasury/unlock/', {'password': '@FPLBoyz254??', 'next': '/treasury/portal/'})
+
+        resp = self.client.post('/treasury/portal/', {
+            'action': 'save_payment',
+            'member': self.m1.id,
+            'gameweek': self.gw1.id,
+            'amount_paid': '500.00',
+            'timestamp_received': timezone.now().strftime('%Y-%m-%dT%H:%M'),
+            'mpesa_code': 'BULK500REF',
+            'verified': True,
+        })
+        self.assertEqual(resp.status_code, 302)
+
+        p1 = Payment.objects.get(member=self.m1, gameweek=self.gw1)
+        p2 = Payment.objects.get(member=self.m1, gameweek=self.gw2)
+        p3 = Payment.objects.get(member=self.m1, gameweek=self.gw3)
+        p4 = Payment.objects.get(member=self.m1, gameweek=gw4)
+
+        self.assertEqual(p1.amount_paid, Decimal('150.00'))
+        self.assertEqual(p2.amount_paid, Decimal('150.00'))
+        self.assertEqual(p3.amount_paid, Decimal('150.00'))
+        self.assertEqual(p4.amount_paid, Decimal('50.00'))
+
+    def test_payment_edit_excess_rollover(self):
+        """
+        Editing a payment from 150 to 300 caps current GW at 150 and rolls over remaining 150 to next GW.
+        """
+        p1 = Payment.objects.create(
+            member=self.m1,
+            gameweek=self.gw1,
+            amount_paid=Decimal('150.00'),
+            timestamp_received=timezone.now(),
+            mpesa_code="ORIG150",
+            verified=True
+        )
+
+        self.client.post('/treasury/unlock/', {'password': '@FPLBoyz254??', 'next': '/treasury/portal/'})
+        edit_url = f'/treasury/payment/{p1.id}/edit/'
+
+        resp = self.client.post(edit_url, {
+            'member': self.m1.id,
+            'gameweek': self.gw1.id,
+            'amount_paid': '300.00',
+            'timestamp_received': timezone.now().strftime('%Y-%m-%dT%H:%M'),
+            'mpesa_code': 'EDIT300REF',
+            'verified': True,
+            'notes': 'Edited in test'
+        })
+        self.assertEqual(resp.status_code, 302)
+
+        p1.refresh_from_db()
+        p2 = Payment.objects.get(member=self.m1, gameweek=self.gw2)
+
+        self.assertEqual(p1.amount_paid, Decimal('150.00'))
+        self.assertEqual(p2.amount_paid, Decimal('150.00'))
+
+    def test_api_check_deadline_with_member_existing_balance(self):
+        """
+        API returns existing partial payment, balance due, and recommended amount.
+        """
+        Payment.objects.create(
+            member=self.m1,
+            gameweek=self.gw2,
+            amount_paid=Decimal('83.33'),
+            timestamp_received=timezone.now(),
+            mpesa_code="PRIZE83",
+            verified=True
+        )
+
+        self.client.post('/treasury/unlock/', {'password': '@FPLBoyz254??', 'next': '/treasury/portal/'})
+        resp = self.client.get(f'/treasury/api/check-deadline/?gw_id={self.gw2.id}&member_id={self.m1.id}')
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+
+        self.assertTrue(data['has_existing'])
+        self.assertAlmostEqual(data['existing_paid'], 83.33, places=2)
+        self.assertAlmostEqual(data['balance_due'], 66.67, places=2)
+        self.assertAlmostEqual(data['recommended_amount'], 66.67, places=2)
+
 
 
 

@@ -16,7 +16,13 @@ from treasury.services.ledger_matrix import build_financial_ledger_matrix
 
 from treasury.services.pot_calculator import get_treasury_summary, get_member_financial_leaderboard
 from treasury.decorators import treasury_admin_required
-from treasury.services.payment_allocation import process_bulk_payment_carryover, apply_winnings_to_future_gameweeks, get_member_available_prize_balance, record_cash_payout
+from treasury.services.payment_allocation import (
+    process_bulk_payment_carryover,
+    apply_winnings_to_future_gameweeks,
+    get_member_available_prize_balance,
+    record_cash_payout,
+    allocate_payment_with_rollover
+)
 
 
 
@@ -167,55 +173,33 @@ def treasurer_portal_view(request):
                 notes = form.cleaned_data['notes']
                 verified = form.cleaned_data.get('verified', True)
 
-                # Check if this is an excess payment (>150 or >200 if late)
-                is_late_gw = (
-                    gameweek.number not in (1, 2, 19, 38)
-                    and timestamp_received
-                    and gameweek.deadline_time
-                    and timestamp_received > gameweek.deadline_time
+                # Process payment using unified allocation engine with automatic rollover
+                created_payments = allocate_payment_with_rollover(
+                    member=member,
+                    start_gw=gameweek,
+                    total_amount=amount_paid,
+                    timestamp=timestamp_received,
+                    mpesa_code=mpesa_code,
+                    notes=notes,
+                    verified=verified,
+                    is_prize=False
                 )
-                required_due = Decimal('200.00') if is_late_gw else Decimal('150.00')
 
-                if amount_paid > required_due or (amount_paid > Decimal('150.00') and not is_late_gw):
-                    # Excess lump-sum payment -> distribute across starting GW and subsequent gameweeks
-                    created_payments = process_bulk_payment_carryover(
-                        member=member,
-                        start_gw=gameweek,
-                        total_amount=amount_paid,
-                        timestamp=timestamp_received,
-                        mpesa_code=mpesa_code,
-                        notes=notes
-                    )
+                if len(created_payments) > 1:
                     messages.success(
                         request,
-                        f"✅ Payment of Ksh. {amount_paid:,.2f} recorded for {member.manager_name}! Disbursed across {len(created_payments)} gameweeks starting GW {gameweek.number}."
+                        f"✅ Payment of Ksh. {amount_paid:,.2f} recorded for {member.manager_name}! Distributed across {len(created_payments)} gameweeks starting GW {gameweek.number}."
                     )
-                else:
-                    # Single payment or top-up for this gameweek
-                    existing = Payment.objects.filter(member=member, gameweek=gameweek).first()
-                    if existing:
-                        existing.amount_paid = amount_paid
-                        existing.timestamp_received = timestamp_received
-                        if mpesa_code:
-                            existing.mpesa_code = mpesa_code
-                        if notes:
-                            existing.notes = notes
-                        existing.verified = verified
-                        existing.save()
-                        payment = existing
-                    else:
-                        payment = form.save()
-
+                elif created_payments:
+                    payment = created_payments[0]
                     late_text = " (⚠️ Late fine of Ksh. 50 added to BBQ pot)" if payment.is_late else ""
                     messages.success(
                         request,
-                        f"✅ Recorded payment of Ksh. {payment.amount_paid} for {payment.member.manager_name} (GW {payment.gameweek.number}){late_text}."
+                        f"✅ Recorded payment of Ksh. {amount_paid:,.2f} for {payment.member.manager_name} (GW {payment.gameweek.number}){late_text}."
                     )
-                    AuditLog.objects.create(
-                        action='PAYMENT_CREATED',
-                        description=f"Recorded payment of Ksh. {payment.amount_paid} for {payment.member.manager_name} (GW {payment.gameweek.number}). Code: {payment.mpesa_code}",
-                        performed_by='Treasurer'
-                    )
+                else:
+                    messages.info(request, f"Payment recorded for {member.manager_name}.")
+
                 return redirect('treasurer_portal')
             else:
                 messages.error(request, "Please correct the errors in the payment form.")
@@ -235,7 +219,7 @@ def treasurer_portal_view(request):
     for m in members:
         avail = get_member_available_prize_balance(m)
         cash_paid = PrizePayout.objects.filter(member=m, payout_method='MPESA_CASH').aggregate(total=models_sum('amount'))['total'] or Decimal('0.00')
-        reinvested = Payment.objects.filter(member=m, mpesa_code__icontains="PRIZE", verified=True).aggregate(total=models_sum('amount_paid'))['total'] or Decimal('0.00')
+        reinvested = PrizePayout.objects.filter(member=m, payout_method='REINVESTED').aggregate(total=models_sum('amount'))['total'] or Decimal('0.00')
         members_winnings_list.append({
             'member': m,
             'available_winnings': avail,
@@ -262,19 +246,59 @@ def treasurer_portal_view(request):
 def payment_edit_view(request, payment_id):
     """
     Edit / Update an existing Payment record.
+    If updated amount exceeds standard Ksh. 150.00, caps current GW at 150 and rolls over excess to next GWs.
     """
     payment = get_object_or_404(Payment, pk=payment_id)
 
     if request.method == 'POST':
         form = PaymentForm(request.POST, instance=payment)
         if form.is_valid():
-            updated_payment = form.save()
-            AuditLog.objects.create(
-                action='PAYMENT_UPDATED',
-                description=f"Updated payment ID #{updated_payment.id} for {updated_payment.member.manager_name} (GW {updated_payment.gameweek.number}) to Ksh. {updated_payment.amount_paid}.",
-                performed_by='Treasurer'
-            )
-            messages.success(request, f"✅ Payment for {updated_payment.member.manager_name} (GW {updated_payment.gameweek.number}) updated successfully.")
+            new_amount = form.cleaned_data['amount_paid']
+            member = form.cleaned_data['member']
+            gameweek = form.cleaned_data['gameweek']
+            timestamp = form.cleaned_data['timestamp_received']
+            mpesa_code = form.cleaned_data['mpesa_code']
+            notes = form.cleaned_data['notes']
+            verified = form.cleaned_data.get('verified', True)
+
+            standard_rate = Decimal('150.00')
+            if new_amount > standard_rate:
+                # Cap this payment at 150 and rollover excess to next GWs
+                payment.amount_paid = standard_rate
+                payment.timestamp_received = timestamp
+                payment.mpesa_code = mpesa_code
+                payment.notes = notes
+                payment.verified = verified
+                payment.save()
+
+                excess = new_amount - standard_rate
+                next_gw = Gameweek.objects.filter(number__gt=gameweek.number).order_by('number').first()
+                if next_gw and excess > Decimal('0.00'):
+                    allocate_payment_with_rollover(
+                        member=member,
+                        start_gw=next_gw,
+                        total_amount=excess,
+                        timestamp=timestamp,
+                        mpesa_code=mpesa_code,
+                        notes=f"Excess rollover from GW {gameweek.number} payment edit",
+                        verified=verified,
+                        is_prize=False
+                    )
+
+                AuditLog.objects.create(
+                    action='PAYMENT_UPDATED',
+                    description=f"Updated payment ID #{payment.id} for {member.manager_name} (GW {gameweek.number}) to Ksh. 150.00 and rolled over Ksh. {excess:,.2f} to future GWs.",
+                    performed_by='Treasurer'
+                )
+                messages.success(request, f"✅ Payment for {member.manager_name} (GW {gameweek.number}) capped at Ksh. 150.00, and excess Ksh. {excess:,.2f} rolled over to subsequent GWs.")
+            else:
+                updated_payment = form.save()
+                AuditLog.objects.create(
+                    action='PAYMENT_UPDATED',
+                    description=f"Updated payment ID #{updated_payment.id} for {updated_payment.member.manager_name} (GW {updated_payment.gameweek.number}) to Ksh. {updated_payment.amount_paid}.",
+                    performed_by='Treasurer'
+                )
+                messages.success(request, f"✅ Payment for {updated_payment.member.manager_name} (GW {updated_payment.gameweek.number}) updated successfully.")
             return redirect('treasurer_portal')
     else:
         # Pre-format datetime-local for input
@@ -317,9 +341,11 @@ def payment_delete_view(request, payment_id):
 @treasury_admin_required
 def api_check_deadline(request):
     """
-    AJAX endpoint to check if a chosen timestamp is after the GW deadline.
+    AJAX endpoint to check if a chosen timestamp is after the GW deadline,
+    and returns any existing partial payment or balance due for the selected member.
     """
     gw_id = request.GET.get('gw_id')
+    member_id = request.GET.get('member_id')
     timestamp_str = request.GET.get('timestamp')
 
     if not gw_id:
@@ -329,6 +355,13 @@ def api_check_deadline(request):
         gw = Gameweek.objects.get(pk=gw_id)
     except Gameweek.DoesNotExist:
         return JsonResponse({'error': 'Gameweek not found'}, status=404)
+
+    member = None
+    if member_id:
+        try:
+            member = Member.objects.get(pk=member_id)
+        except Member.DoesNotExist:
+            member = None
 
     if timestamp_str:
         try:
@@ -347,12 +380,36 @@ def api_check_deadline(request):
         is_late = ts > gw.deadline_time
 
     late_fine = Decimal('50.00') if is_late else Decimal('0.00')
-    recommended_amount = Decimal('200.00') if is_late else Decimal('150.00')
+    standard_due = Decimal('150.00')
+
+    existing_paid = Decimal('0.00')
+    has_existing = False
+    if member:
+        existing_p = Payment.objects.filter(member=member, gameweek=gw).first()
+        if existing_p:
+            existing_paid = existing_p.amount_paid
+            has_existing = True
+
+    balance_due = max(Decimal('0.00'), standard_due - existing_paid)
+
+    # Recommended amount
+    if has_existing and balance_due > Decimal('0.00'):
+        recommended_amount = balance_due
+    elif has_existing and balance_due <= Decimal('0.00'):
+        recommended_amount = standard_due
+    elif is_late:
+        recommended_amount = Decimal('200.00')
+    else:
+        recommended_amount = standard_due
 
     eat_tz = pytz.timezone('Africa/Nairobi')
     dl_local = gw.deadline_time.astimezone(eat_tz).strftime('%b %d, %Y at %I:%M %p EAT') if gw.deadline_time else 'N/A'
 
-    if is_waived:
+    if has_existing and existing_paid < standard_due:
+        msg = f"ℹ️ {member.manager_name} has existing payment of Ksh. {existing_paid:,.2f} for {gw.name}. Balance remaining: Ksh. {balance_due:,.2f}."
+    elif has_existing and existing_paid >= standard_due:
+        msg = f"✓ {member.manager_name} is already fully paid for {gw.name} (Ksh. {existing_paid:,.2f}). Any new payment will automatically rollover to next GW."
+    elif is_waived:
         waiver_reason = {
             1: "Start of the season waiver",
             2: "Teams not yet set up waiver",
@@ -368,6 +425,9 @@ def api_check_deadline(request):
     return JsonResponse({
         'is_late': is_late,
         'is_waived': is_waived,
+        'has_existing': has_existing,
+        'existing_paid': float(existing_paid),
+        'balance_due': float(balance_due),
         'gw_name': gw.name,
         'deadline_str': dl_local,
         'late_fine': float(late_fine),
