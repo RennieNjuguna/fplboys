@@ -91,6 +91,157 @@ WEATHER_REPORTS = [
 ]
 
 
+def build_personalized_manager_review(manager, rank, pts, hits, prize_won, gw_num, is_last, winner_res, third_pts):
+    name = manager.manager_name
+    team = manager.team_name
+
+    # 1. CHAMPION (Rank 1)
+    if rank == 1:
+        badge = "👑 1ST PLACE (CHAMPION)"
+        if "Marve" in name:
+            title = f"{name} - Truly The 'Marve of the Match'"
+            body = f"Living up to his team name with supreme swagger, Marve delivered the ultimate masterclass with {pts} points. Sits proudly atop the 10-man summit and banks Ksh. {prize_won:,.2f}."
+            verdict = "Verdict: Certified Marve of the Match & Cash King"
+        elif "Aron" in name:
+            title = f"{name} - 'Arons' Seize The Crown"
+            body = f"Aron completely flipped the script with an imperious {pts} points to seize 1st place and Ksh. {prize_won:,.2f}. From the trenches straight to the throne!"
+            verdict = "Verdict: King of the Week"
+        elif "Torque" in name or "Dennis" in name:
+            title = f"{name} - 'DenniSkills' Put On A Masterclass"
+            body = f"Dennis unleashed the full torque of DenniSkills with {pts} points to conquer 1st place and Ksh. {prize_won:,.2f} in prize money."
+            verdict = "Verdict: Master Tactician & Champion"
+        elif "Samuel" in name:
+            title = f"{name} - 'maggry shiners' Outshine Everyone"
+            body = f"Samuel's shiners blinded the competition with {pts} points, seizing 1st place and taking home Ksh. {prize_won:,.2f}."
+            verdict = "Verdict: Crowned Champion"
+        elif "King Chris" in name:
+            title = f"{name} - The King Takes His Throne"
+            body = f"King Chris painted a championship masterpiece with {pts} points to reign supreme atop the league, pocketing Ksh. {prize_won:,.2f}."
+            verdict = "Verdict: Royal Victory"
+        elif "Erick" in name:
+            title = f"{name} - 'mambaaa' Delivers The Fatal Bite"
+            body = f"Erick's 'mambaaa' struck with deadly precision for {pts} points to secure top spot and Ksh. {prize_won:,.2f}."
+            verdict = "Verdict: Lethal Strike & GW Champion"
+        elif "Renny" in name:
+            title = f"{name} - The Young Ones Dominate The League"
+            body = f"Renny's 'The Young Ones' outclassed every veteran manager with {pts} points to capture 1st place and Ksh. {prize_won:,.2f}."
+            verdict = "Verdict: Class In Session"
+        elif "Marvin" in name:
+            title = f"{name} - Miracle At 'Don Bosco'"
+            body = f"A miraculous resurgence! Marvin's 'Don Bosco' stunned the league with {pts} points to take 1st place and Ksh. {prize_won:,.2f}."
+            verdict = "Verdict: Divine Masterclass"
+        else:
+            title = f"{name} - Tactical Masterclass & GW Winner"
+            body = f"{name}'s '{team}' delivered a statement performance with {pts} points, taking 1st place and Ksh. {prize_won:,.2f}."
+            verdict = "Verdict: Certified Baller & League Leader"
+
+    # 2. WOODEN SPOON CLOWN (Last Place)
+    elif is_last:
+        badge = "🤡 CLOWN OF THE GAMEWEEK"
+        if "Marvin" in name:
+            title = f"{name} - 'Don Bosco' In Urgent Need Of Prayers"
+            body = f"The undisputed Clown of the Gameweek! Marvin's 'Don Bosco' crashed and burned with {pts} points. Emergency pilgrimage to Don Bosco church advised."
+            verdict = "Verdict: Undisputed Wooden Spoon Clown"
+        elif "Aron" in name:
+            title = f"{name} - 'Arons' Hit Rock Bottom"
+            body = f"Aron put up an unforgettable disasterclass of {pts} points to anchor the clown car at rank #{rank}. Time to delete the team and take up gardening."
+            verdict = "Verdict: Certified Wooden Spoon Clown"
+        elif "King Chris" in name:
+            title = f"{name} - The Painter Drops The Brush"
+            body = f"King Chris suffered a complete canvas catastrophe with {pts} points at rank #{rank}. From royal aspirations straight to clown town."
+            verdict = "Verdict: Dethroned Clown"
+        elif "Erick" in name:
+            title = f"{name} - 'mambaaa' Bites Own Tail"
+            body = f"Erick's 'mambaaa' turned on itself with a pitiful {pts} points to claim last place. The group chat is going to show zero mercy."
+            verdict = "Verdict: Harmless Worm"
+        elif "Bright" in name:
+            title = f"{name} - 'Phill Me In' Completely Emptied"
+            body = f"Bright's team got utterly demolished with {pts} points to anchor the bottom. Relegation panic has officially set in."
+            verdict = "Verdict: Sunk In The Depths"
+        elif "Benn" in name:
+            title = f"{name} - 'Benn's Team' Forgets How To Play"
+            body = f"Benn managed a league-worst {pts} points to take home the wooden spoon. Group chat apologies are expected immediately."
+            verdict = "Verdict: Tactical Meltdown"
+        else:
+            title = f"{name} - The League Punchline"
+            body = f"An unforgettable disasterclass of {pts} points to claim the wooden spoon at rank #{rank}. Footballing crime committed."
+            verdict = "Verdict: Needs Divine Intervention"
+
+    # 3. PODIUM (Ranks 2 & 3)
+    elif rank <= 3:
+        badge = "🥈 2ND PLACE (SILVER)" if rank == 2 else "🥉 3RD PLACE (BRONZE)"
+        if "Samuel" in name:
+            title = f"{name} - 'maggry shiners' Bag The Podium Cash"
+            body = f"Samuel's '{team}' shone under the lights with {pts} points, clinching {badge.split()[0]} place and Ksh. {prize_won:,.2f}."
+            verdict = "Verdict: Silver Shiner & Title Contender"
+        elif "Renny" in name:
+            title = f"{name} - The Young Ones Schooling The Elders"
+            body = f"Renny's 'The Young Ones' showed mature nerve with {pts} points to pocket Ksh. {prize_won:,.2f} on the podium."
+            verdict = "Verdict: Clutch Podium Scrapper"
+        elif "Torque" in name or "Dennis" in name:
+            title = f"{name} - DenniSkills Paying Dividends"
+            body = f"Dennis delivered high skill and cold hard cash, scoring {pts} points to take home Ksh. {prize_won:,.2f} on the podium."
+            verdict = "Verdict: Master Tactician"
+        elif "Marve" in name:
+            title = f"{name} - 'Marve of the Match' In The Money"
+            body = f"Marve stayed right in the prize zone with {pts} points, taking home Ksh. {prize_won:,.2f} on the podium."
+            verdict = "Verdict: Consistent Heavyweight"
+        else:
+            title = f"{name} - Money In The Bank"
+            body = f"{name}'s '{team}' secured {badge.split()[0]} place with {pts} points and Ksh. {prize_won:,.2f}."
+            verdict = "Verdict: Podium Secured"
+
+    # 4. RANK 4 HEARTBREAK
+    elif rank == 4:
+        badge = "💔 4TH PLACE (HEARTBREAK)"
+        if "Torque" in name or "Dennis" in name:
+            title = f"{name} - 'DenniSkills' In The Heartbreak Hotel"
+            body = f"Dennis brought pure skill with {pts} points, but '{team}' missed out on the podium money by a razor-thin margin. High skill, zero shillings."
+            verdict = "Verdict: High Skill, Zero Shillings"
+        else:
+            title = f"{name} - Agonizingly Close To The Money"
+            body = f"{name}'s '{team}' scored {pts} points to finish rank #4, missing the podium cash by just a few points. Pure agony."
+            verdict = "Verdict: Heartbreak Purgatory"
+
+    # 5. MID-TABLE (Ranks 5-7)
+    elif rank <= 7:
+        badge = f"😴 RANK #{rank} (MID-TABLE)"
+        if "King Chris" in name:
+            title = f"{name} - The Painter Strokes A Neutral Canvas"
+            body = f"King Chris entered with royal ambitions, but '{team}' painted a very beige mid-table portrait with {pts} points."
+            verdict = "Verdict: 50/50 Mid-Table Masterpiece"
+        elif "Erick" in name:
+            title = f"{name} - 'mambaaa' Strikes Without Venom"
+            body = f"Erick's '{team}' didn't deliver the fatal bite promised, slithering into rank #{rank} with {pts} points."
+            verdict = "Verdict: Harmless Grass Snake"
+        elif "Benn" in name:
+            title = f"{name} - Minimalist Name, Minimalist Points"
+            body = f"With a team name as creatively minimal as '{team}', his {pts}-point tally was equally subdued at rank #{rank}."
+            verdict = "Verdict: Needs Tactical Ignition"
+        else:
+            title = f"{name} - Floating In Mid-Table"
+            body = f"{name}'s '{team}' registered {pts} points to settle into rank #{rank}."
+            verdict = "Verdict: Sleeping Giant"
+
+    # 6. RELEGATION TRENCH (Ranks 8-9)
+    else:
+        badge = f"💀 RANK #{rank} (RELEGATION TRENCH)"
+        if "Bright" in name:
+            title = f"{name} - 'Phill Me In' Got Filled With Regret"
+            body = f"Bright was anything but cheerful as '{team}' got thoroughly dismantled for {pts} points at rank #{rank}."
+            verdict = "Verdict: Sinking in the Trench"
+        elif "Aron" in name:
+            title = f"{name} - Saved From The Clown Hat By A Whisker"
+            body = f"Aron's {pts}-point return left him lingering dangerously at rank #{rank}, barely escaping the wooden spoon."
+            verdict = "Verdict: One Foot In The Abyss"
+        else:
+            title = f"{name} - Dangerously Close To The Bottom"
+            body = f"{name}'s '{team}' finished with {pts} points at rank #{rank}. Urgent tactical surgery required."
+            verdict = "Verdict: Code Red Alert"
+
+    return badge, title, body, verdict
+
+
 def generate_roast_edition(gameweek: Gameweek, force_update=True) -> RoastEdition:
     """
     Analyzes Gameweek results and payments to generate a savage, hilarious newspaper edition.
@@ -210,6 +361,7 @@ def generate_roast_edition(gameweek: Gameweek, force_update=True) -> RoastEditio
         edition.manager_roasts.all().delete()
 
         # Create individual manager roasts
+        third_pts = results[2].net_points if len(results) >= 3 else 0
         for r in results:
             rank = r.league_rank
             pts = r.net_points
@@ -217,63 +369,17 @@ def generate_roast_edition(gameweek: Gameweek, force_update=True) -> RoastEditio
             manager = r.member
             is_last = (r == last_res)
 
-            if rank == 1:
-                badge = '👑 1ST PLACE (CHAMPION)'
-                title = f"{manager.manager_name} - Tactical Masterclass & GW Winner"
-                body = (
-                    f"{manager.manager_name}'s {manager.team_name} delivered a statement performance with a magnificent {pts} points, "
-                    f"clinching 1st place and Ksh. {r.gw_prize_won:,.2f} in prize money. Sharp captaincy and clinical returns gave them total command of the gameweek."
-                )
-                verdict = 'Verdict: Certified Baller & League Leader'
-            elif is_last and len(results) > 1:
-                badge = '🤡 CLOWN OF THE GAMEWEEK'
-                title = f"{manager.manager_name} - The League Punchline"
-                body = (
-                    f"An unforgettable disasterclass of {pts} points to claim the undisputed wooden spoon at rank #{rank}. "
-                    f"Your team didn't just underperform—it committed a footballing felony. Group chat banter is going to be merciless."
-                )
-                verdict = 'Verdict: Delete App & Try Checkers'
-            elif rank == 2:
-                badge = '🥈 2ND PLACE (SILVER PODIUM)'
-                title = f"{manager.manager_name} - High-Flying Silver Finish"
-                body = (
-                    f"A fantastic round scoring {pts} points to take 2nd place and Ksh. {r.gw_prize_won:,.2f}. "
-                    f"Pushed the champion right down to the final whistle. High-class fantasy management."
-                )
-                verdict = 'Verdict: Title Contender'
-            elif rank == 3:
-                badge = '🥉 3RD PLACE (BRONZE PODIUM)'
-                title = f"{manager.manager_name} - Money In The Bank"
-                body = (
-                    f"Scored {pts} points to secure the final podium cash prize of Ksh. {r.gw_prize_won:,.2f}. "
-                    f"Solid and effective execution when it mattered most."
-                )
-                verdict = 'Verdict: Podium Secured'
-            elif 4 <= rank <= 7:
-                badge = '😴 MID-TABLE PURGATORY'
-                title = f"{manager.manager_name} - Floating in the Middle"
-                hit_note = f" (after -{hits} transfer deduction)" if hits > 0 else ""
-                body = (
-                    f"Recorded {pts} net points{hit_note} to settle into rank #{rank}. "
-                    f"Just a few points away from the podium money. Decent foundation, but needs a sharper captaincy pick to challenge for the top."
-                )
-                verdict = 'Verdict: Sleeping Giant'
-            elif 8 <= rank <= 9:
-                badge = '💀 RELEGATION SINKHOLE'
-                title = f"{manager.manager_name} - Dangerously Close to the Bottom"
-                body = (
-                    f"A difficult round ending with {pts} points at rank #{rank}. "
-                    f"Defenders conceded, forwards blanked, and the bench points are looking painful. Urgent tactical surgery required before next deadline."
-                )
-                verdict = 'Verdict: Code Red Alert'
-            else:
-                badge = '🤡 CLOWN OF THE GAMEWEEK'
-                title = f"{manager.manager_name} - The League Punchline"
-                body = (
-                    f"An unforgettable disasterclass of {pts} points at rank #{rank}. "
-                    f"Please submit an apology letter to the group chat immediately."
-                )
-                verdict = 'Verdict: Needs Divine Intervention'
+            badge, title, body, verdict = build_personalized_manager_review(
+                manager=manager,
+                rank=rank,
+                pts=pts,
+                hits=hits,
+                prize_won=r.gw_prize_won,
+                gw_num=gw_num,
+                is_last=is_last,
+                winner_res=winner_res,
+                third_pts=third_pts
+            )
 
             ManagerRoastItem.objects.create(
                 edition=edition,
