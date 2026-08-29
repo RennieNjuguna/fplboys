@@ -18,17 +18,6 @@ def gazette_view(request):
 
     try:
         all_editions = list(RoastEdition.objects.filter(is_published=True).select_related('gameweek').order_by('-edition_number'))
-
-        # If no editions exist yet, auto-generate for any gameweeks that have results
-        if not all_editions:
-            gws_with_results = Gameweek.objects.filter(results__isnull=False).distinct().order_by('-number')
-            for gw in gws_with_results:
-                try:
-                    generate_roast_edition(gw, force_update=True)
-                except Exception:
-                    pass
-            all_editions = list(RoastEdition.objects.filter(is_published=True).select_related('gameweek').order_by('-edition_number'))
-
         selected_gw_num = request.GET.get('gw')
 
         if selected_gw_num:
@@ -43,8 +32,8 @@ def gazette_view(request):
         if selected_edition:
             manager_roasts = selected_edition.manager_roasts.select_related('member').order_by('rank_in_gw', 'order')
 
-    except Exception as e:
-        # Handles unmigrated database state gracefully
+    except Exception:
+        # Handles unmigrated or empty database states safely
         pass
 
     context = {
@@ -53,26 +42,6 @@ def gazette_view(request):
         'manager_roasts': manager_roasts,
     }
     return render(request, 'news/gazette.html', context)
-
-
-def generate_gazette_action(request):
-    """
-    Trigger manual generation of all Gazette editions.
-    """
-    count = 0
-    gws_with_results = Gameweek.objects.filter(results__isnull=False).distinct().order_by('number')
-    for gw in gws_with_results:
-        try:
-            generate_roast_edition(gw, force_update=True)
-            count += 1
-        except Exception:
-            pass
-
-    if count > 0:
-        messages.success(request, f"📰 Published {count} Gazette roast editions successfully!")
-    else:
-        messages.warning(request, "No gameweek results found. Make sure to sync with FPL first.")
-    return redirect('gazette')
 
 
 def api_gazette_data(request, edition_num):

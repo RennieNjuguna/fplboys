@@ -91,6 +91,7 @@ class NewsGazetteTests(TestCase):
 
     def test_gazette_view_renders_successfully(self):
         """Test the public Gazette newspaper view returns 200 and displays newspaper content"""
+        generate_roast_edition(self.gw1)
         resp = self.client.get('/news/')
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "THE FPL BOYZ GAZETTE")

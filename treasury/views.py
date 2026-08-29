@@ -120,13 +120,28 @@ def treasurer_portal_view(request):
 
         elif action == 'generate_roasts':
             try:
+                from django.core.management import call_command
+                call_command('migrate', interactive=False)
+
                 from news.services.roast_engine import generate_roast_edition
-                latest_gw = Gameweek.objects.filter(status__in=['finished', 'active']).order_by('-number').first()
-                if latest_gw:
-                    ed = generate_roast_edition(latest_gw, force_update=True)
-                    messages.success(request, f"📰 Published The Gazette Issue #{ed.edition_number} for GW {latest_gw.number}!")
+                gws_with_results = Gameweek.objects.filter(results__isnull=False).distinct().order_by('number')
+                count = 0
+                for gw in gws_with_results:
+                    try:
+                        generate_roast_edition(gw, force_update=True)
+                        count += 1
+                    except Exception:
+                        pass
+
+                if count > 0:
+                    messages.success(request, f"📰 Published {count} Gazette issue(s) successfully!")
                 else:
-                    messages.warning(request, "No active or finished gameweeks found.")
+                    latest_gw = Gameweek.objects.filter(status__in=['finished', 'active']).order_by('-number').first()
+                    if latest_gw:
+                        ed = generate_roast_edition(latest_gw, force_update=True)
+                        messages.success(request, f"📰 Published The Gazette Issue #{ed.edition_number} for GW {latest_gw.number}!")
+                    else:
+                        messages.warning(request, "No gameweek results found. Make sure to sync with FPL first.")
             except Exception as e:
                 messages.error(request, f"Error publishing Gazette: {e}")
             return redirect('treasurer_portal')
