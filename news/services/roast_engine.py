@@ -147,8 +147,8 @@ def generate_roast_edition(gameweek: Gameweek, force_update=True) -> RoastEditio
     # Defaulter roast / waiver rules
     if gw_num in [1, 2]:
         defaulter_roast = (
-            f"🚨 LEAGUE GRACE PERIOD (GW {gw_num}): The League Committee has officially waived all late penalty fines for the opening gameweeks! "
-            f"All managers are cleared of late fees for GW 1 and GW 2. Enjoy the amnesty while it lasts—strict Ksh. 50 fines apply starting GW 3!"
+            f"🚨 LEAGUE GRACE PERIOD (GW {gw_num}): The League Committee has officially declared a full grace period for GW 1 & GW 2! "
+            f"Zero late penalty fines apply for all managers. Defaulters get a clean slate for the opening fortnight—strict Ksh. 50 fines will be enforced by the Treasurer starting GW 3!"
         )
     else:
         # Check actual late payments
@@ -164,7 +164,12 @@ def generate_roast_edition(gameweek: Gameweek, force_update=True) -> RoastEditio
             defaulter_roast = "All 10 managers paid on time! The Treasurer extends sincere congratulations to the entire league."
 
     # Hit roast
-    if biggest_hit_taker:
+    if gw_num == 1:
+        transfer_hit_roast = (
+            "Season Kickoff Window: All 10 managers launched with unlimited free squad selections prior to the GW 1 deadline. "
+            "Point-deducting transfer hits unlock from GW 2 onward, where panic transfers and tactical chaos will officially commence!"
+        )
+    elif biggest_hit_taker:
         transfer_hit_roast = (
             f"Transfer Market Alert: {biggest_hit_taker.member.manager_name} took a -{biggest_hit_taker.transfer_cost} point hit in transfers, "
             f"finishing with {biggest_hit_taker.net_points} net points. A costly gamble that did not quite deliver the expected dividends."
