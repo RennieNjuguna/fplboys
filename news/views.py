@@ -10,33 +10,40 @@ def gazette_view(request):
     Renders The FPL Boys Gazette newspaper layout with issue selector,
     breaking news ticker, brutal roast cards, classifieds, and PDF export.
     """
-    all_editions = list(RoastEdition.objects.filter(is_published=True).select_related('gameweek').order_by('-edition_number'))
+    all_editions = []
+    selected_edition = None
+    manager_roasts = []
 
-    # If no editions exist yet, auto-generate for finished gameweeks
-    if not all_editions:
-        finished_gws = Gameweek.objects.filter(status__in=['finished', 'active']).order_by('-number')
-        for gw in finished_gws:
-            try:
-                generate_roast_edition(gw)
-            except Exception:
-                pass
+    try:
         all_editions = list(RoastEdition.objects.filter(is_published=True).select_related('gameweek').order_by('-edition_number'))
 
-    selected_gw_num = request.GET.get('gw')
-    selected_edition = None
+        # If no editions exist yet, auto-generate for finished gameweeks
+        if not all_editions:
+            finished_gws = Gameweek.objects.filter(status__in=['finished', 'active']).order_by('-number')
+            for gw in finished_gws:
+                try:
+                    generate_roast_edition(gw)
+                except Exception:
+                    pass
+            all_editions = list(RoastEdition.objects.filter(is_published=True).select_related('gameweek').order_by('-edition_number'))
 
-    if selected_gw_num:
-        try:
-            selected_edition = RoastEdition.objects.filter(edition_number=int(selected_gw_num), is_published=True).first()
-        except (ValueError, TypeError):
-            selected_edition = None
+        selected_gw_num = request.GET.get('gw')
 
-    if not selected_edition and all_editions:
-        selected_edition = all_editions[0]
+        if selected_gw_num:
+            try:
+                selected_edition = RoastEdition.objects.filter(edition_number=int(selected_gw_num), is_published=True).first()
+            except (ValueError, TypeError):
+                selected_edition = None
 
-    manager_roasts = []
-    if selected_edition:
-        manager_roasts = selected_edition.manager_roasts.select_related('member').order_by('rank_in_gw', 'order')
+        if not selected_edition and all_editions:
+            selected_edition = all_editions[0]
+
+        if selected_edition:
+            manager_roasts = selected_edition.manager_roasts.select_related('member').order_by('rank_in_gw', 'order')
+
+    except Exception as e:
+        # Handles unmigrated database state gracefully
+        pass
 
     context = {
         'all_editions': all_editions,
