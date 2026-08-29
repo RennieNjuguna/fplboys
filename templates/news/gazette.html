@@ -1,0 +1,338 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block title %}The FPL Boys Gazette - Issue #{{ selected_edition.edition_number|default:"1" }} - FPL Boys{% endblock %}
+
+{% block content %}
+<div class="space-y-6 max-w-5xl mx-auto">
+
+    <!-- Top Action Bar & Edition Switcher -->
+    <div class="bg-gray-900 border border-gray-800 rounded-3xl p-4 sm:p-5 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4">
+        
+        <!-- Left: Title & Edition Selector -->
+        <div class="flex items-center space-x-3 w-full sm:w-auto">
+            <div class="w-10 h-10 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 text-xl font-serif font-black shadow-inner">
+                📰
+            </div>
+            <div>
+                <h1 class="text-lg sm:text-xl font-black text-white font-serif tracking-wide flex items-center gap-2">
+                    THE FPL BOYZ GAZETTE
+                    <span class="text-[10px] bg-red-950 text-red-400 border border-red-800 px-2 py-0.5 rounded-full font-sans font-bold uppercase tracking-widest animate-pulse">BRUTAL EDITION</span>
+                </h1>
+                <p class="text-xs text-gray-400">
+                    The official satirical tabloid roasted after every gameweek.
+                </p>
+            </div>
+        </div>
+
+        <!-- Right: Edition Dropdown + Export PDF & Print Buttons -->
+        <div class="flex flex-wrap items-center gap-2.5 w-full sm:w-auto justify-end">
+            
+            <!-- Edition Selector Dropdown -->
+            <form method="GET" action="{% url 'gazette' %}" class="flex items-center">
+                <select name="gw" onchange="this.form.submit()" class="bg-gray-800 border border-purple-700/60 text-white text-xs font-bold rounded-xl px-3 py-2 focus:ring-fpl-green focus:border-fpl-green">
+                    {% for ed in all_editions %}
+                    <option value="{{ ed.edition_number }}" {% if selected_edition and ed.id == selected_edition.id %}selected{% endif %}>
+                        Issue #{{ ed.edition_number }} (GW {{ ed.gameweek.number }})
+                    </option>
+                    {% endfor %}
+                </select>
+            </form>
+
+            <!-- Export PDF Button -->
+            <button onclick="exportGazettePDF()" id="btn-export-pdf" class="inline-flex items-center px-3.5 py-2 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white text-xs font-bold rounded-xl shadow-lg transition-all border border-emerald-400/30">
+                <i data-lucide="file-down" class="w-3.5 h-3.5 mr-1.5"></i>
+                <span>Download PDF</span>
+            </button>
+
+            <!-- Print Button -->
+            <button onclick="window.print()" class="inline-flex items-center px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs font-bold rounded-xl border border-gray-700 transition-colors">
+                <i data-lucide="printer" class="w-3.5 h-3.5 mr-1.5"></i>
+                <span>Print</span>
+            </button>
+
+        </div>
+
+    </div>
+
+    {% if selected_edition %}
+    <!-- THE NEWSPAPER CONTAINER (Printable & Exportable Area) -->
+    <div id="gazette-paper" class="bg-[#fcfaf2] dark:bg-[#15171e] text-gray-900 dark:text-gray-100 border-4 border-double border-gray-400 dark:border-gray-700 rounded-3xl p-5 sm:p-8 shadow-2xl space-y-6 font-serif relative overflow-hidden">
+        
+        <!-- Retro Paper Background Accent -->
+        <div class="border-b-2 border-gray-900 dark:border-gray-300 pb-3 text-center space-y-2">
+            
+            <!-- Top Tagline -->
+            <div class="flex items-center justify-between text-[9px] sm:text-[11px] font-sans uppercase font-bold tracking-widest text-gray-600 dark:text-gray-400 border-b border-gray-300 dark:border-gray-800 pb-1 px-1">
+                <span>✦ "WE ROAST BECAUSE WE CARE" ✦</span>
+                <span class="hidden sm:inline">OFFICIAL LEAGUE TABLOID & CLOWN WATCH</span>
+                <span>VOL. I • NO. {{ selected_edition.edition_number }}</span>
+            </div>
+
+            <!-- Main Newspaper Masthead -->
+            <h1 class="text-3xl sm:text-6xl font-black uppercase tracking-tight text-gray-950 dark:text-white font-serif py-1 sm:py-2 select-none">
+                THE FPL BOYZ GAZETTE
+            </h1>
+
+            <!-- Masthead Metadata Bar -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[10px] sm:text-xs font-sans border-t-2 border-b-2 border-gray-900 dark:border-gray-300 py-1.5 font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                <div>📅 {{ selected_edition.publish_date|date:"D, d M Y" }}</div>
+                <div>💰 Price: Ksh. 150 (Or Podium)</div>
+                <div>📍 Nairobi Bureau</div>
+                <div>⛅ {{ selected_edition.weather_report }}</div>
+            </div>
+
+        </div>
+
+        <!-- Breaking News Alert Banner -->
+        <div class="bg-red-600 text-white font-sans text-xs font-bold px-3.5 py-1.5 rounded-lg flex items-center justify-between shadow-sm">
+            <div class="flex items-center space-x-2 truncate">
+                <span class="bg-black text-red-400 px-1.5 py-0.5 rounded text-[10px] uppercase font-black tracking-widest">LATEST WIRE</span>
+                <span class="truncate">{{ selected_edition.headline }}</span>
+            </div>
+            <span class="hidden sm:inline text-[10px] uppercase tracking-wider text-red-200">Exclusive</span>
+        </div>
+
+        <!-- FRONT PAGE LEAD STORY (2 Columns) -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 pb-6 border-b border-gray-300 dark:border-gray-800">
+            
+            <!-- Lead Article (Takes 2 Columns) -->
+            <div class="lg:col-span-2 space-y-3">
+                <h2 class="text-xl sm:text-3xl font-black text-gray-950 dark:text-white leading-tight font-serif uppercase">
+                    {{ selected_edition.headline }}
+                </h2>
+                <h3 class="text-xs sm:text-sm font-sans font-semibold text-gray-600 dark:text-gray-400 italic">
+                    {{ selected_edition.subheadline }}
+                </h3>
+                
+                <div class="text-[11px] font-sans text-gray-500 dark:text-gray-400 font-bold uppercase pb-1 border-b border-dashed border-gray-300 dark:border-gray-800">
+                    By <span class="text-gray-900 dark:text-gray-200">{{ selected_edition.chief_editor }}</span> • Chief Football & Banter Correspondent
+                </div>
+
+                <!-- Article Body with Drop Cap -->
+                <div class="text-xs sm:text-sm leading-relaxed text-gray-800 dark:text-gray-200 space-y-3 pt-1 text-justify font-serif">
+                    <p class="first-letter:text-4xl first-letter:font-black first-letter:float-left first-letter:mr-2 first-letter:text-amber-600 dark:first-letter:text-amber-400 leading-relaxed">
+                        {{ selected_edition.editorial_lead }}
+                    </p>
+                </div>
+            </div>
+
+            <!-- Top 2 Spotlight Feature Cards (Clown vs King) -->
+            <div class="space-y-4 font-sans">
+                
+                <!-- 👑 King of the Week Card -->
+                {% if selected_edition.king_of_the_week %}
+                <div class="bg-amber-50 dark:bg-amber-950/30 border-2 border-amber-500/70 rounded-2xl p-4 shadow-md space-y-2">
+                    <div class="flex items-center justify-between">
+                        <span class="text-[10px] font-black uppercase tracking-widest text-amber-800 dark:text-amber-400 bg-amber-200 dark:bg-amber-900/80 px-2 py-0.5 rounded-md">
+                            👑 FLUKE OF THE WEEK
+                        </span>
+                        <span class="text-xs font-mono font-bold text-amber-700 dark:text-amber-300">#1 Spot</span>
+                    </div>
+                    <div class="text-sm sm:text-base font-black text-gray-900 dark:text-white">
+                        {{ selected_edition.king_of_the_week.manager_name }}
+                    </div>
+                    <p class="text-xs text-gray-700 dark:text-gray-300 leading-snug">
+                        {{ selected_edition.king_reason }}
+                    </p>
+                </div>
+                {% endif %}
+
+                <!-- 🤡 Clown of the Week Card -->
+                {% if selected_edition.clown_of_the_week %}
+                <div class="bg-rose-50 dark:bg-rose-950/30 border-2 border-rose-600/70 rounded-2xl p-4 shadow-md space-y-2">
+                    <div class="flex items-center justify-between">
+                        <span class="text-[10px] font-black uppercase tracking-widest text-rose-800 dark:text-rose-400 bg-rose-200 dark:bg-rose-900/80 px-2 py-0.5 rounded-md">
+                            🤡 CLOWN OF THE GAMEWEEK
+                        </span>
+                        <span class="text-xs font-mono font-bold text-rose-700 dark:text-rose-300">Wooden Spoon</span>
+                    </div>
+                    <div class="text-sm sm:text-base font-black text-gray-900 dark:text-white">
+                        {{ selected_edition.clown_of_the_week.manager_name }}
+                    </div>
+                    <p class="text-xs text-gray-700 dark:text-gray-300 leading-snug">
+                        {{ selected_edition.clown_reason }}
+                    </p>
+                </div>
+                {% endif %}
+
+            </div>
+
+        </div>
+
+        <!-- MANAGER-BY-MANAGER AUTOPSY GRID -->
+        <div class="space-y-4">
+            <div class="flex items-center justify-between border-b-2 border-gray-900 dark:border-gray-300 pb-1">
+                <h3 class="text-lg sm:text-xl font-black uppercase font-serif tracking-tight text-gray-900 dark:text-white flex items-center space-x-2">
+                    <span>⚔️ THE 10 MANAGERS AUTOPSY REPORT</span>
+                </h3>
+                <span class="text-[10px] sm:text-xs font-sans uppercase text-gray-500 font-bold">Unfiltered Reviews</span>
+            </div>
+
+            <!-- 2-Column Grid for 10 Managers -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 font-sans">
+                {% for item in manager_roasts %}
+                <div class="border border-gray-300 dark:border-gray-800 bg-gray-50/80 dark:bg-gray-900/60 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow space-y-2 flex flex-col justify-between">
+                    <div>
+                        <!-- Header: Name, Rank & Badge -->
+                        <div class="flex items-center justify-between gap-2 border-b border-gray-200 dark:border-gray-800 pb-2">
+                            <div>
+                                <h4 class="font-bold text-xs sm:text-sm text-gray-900 dark:text-white font-serif">
+                                    {{ item.member.manager_name }}
+                                </h4>
+                                <span class="text-[10px] text-gray-500 dark:text-gray-400 block truncate">{{ item.member.team_name }}</span>
+                            </div>
+                            <div class="text-right">
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold {% if item.rank_in_gw == 1 %}bg-amber-500/20 text-amber-500 border border-amber-500/40{% elif item.rank_in_gw == 2 %}bg-slate-400/20 text-slate-300 border border-slate-400/40{% elif item.rank_in_gw == 3 %}bg-amber-700/20 text-amber-600 border border-amber-700/40{% elif item.rank_in_gw == 10 %}bg-rose-500/20 text-rose-400 border border-rose-500/40{% else %}bg-purple-900/40 text-purple-300 border border-purple-700/40{% endif %}">
+                                    {{ item.badge }}
+                                </span>
+                                <div class="text-[11px] font-mono font-black text-gray-900 dark:text-white mt-0.5">
+                                    {{ item.net_points }} pts (Rank #{{ item.rank_in_gw }})
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Roast Headline & Body -->
+                        <div class="pt-2 space-y-1">
+                            <div class="font-black text-xs text-gray-900 dark:text-gray-100 font-serif">
+                                {{ item.roast_title }}
+                            </div>
+                            <p class="text-xs text-gray-700 dark:text-gray-300 leading-relaxed font-serif">
+                                {{ item.roast_body }}
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Stamped Verdict Box -->
+                    <div class="pt-2 mt-2 border-t border-dashed border-gray-300 dark:border-gray-800 flex items-center justify-between text-[11px]">
+                        <span class="font-mono text-[10px] uppercase font-bold text-gray-500">Official Ruling:</span>
+                        <span class="font-mono font-bold text-amber-700 dark:text-amber-400 text-[10px] tracking-tight">
+                            {{ item.verdict }}
+                        </span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- SPECIAL GAZETTE COLUMNS: DEFAULTER ROAST & TRANSFER HITS & QUOTE -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t-2 border-gray-900 dark:border-gray-300 font-sans">
+            
+            <!-- Column 1: Defaulter Watch -->
+            <div class="bg-amber-950/20 border border-amber-700/40 rounded-2xl p-4 space-y-2">
+                <div class="flex items-center space-x-1.5 text-amber-400 font-bold text-xs uppercase tracking-wider">
+                    <span>💸 TREASURER'S BOUNTY DESK</span>
+                </div>
+                <p class="text-xs text-gray-700 dark:text-gray-300 font-serif leading-relaxed">
+                    {{ selected_edition.defaulter_roast }}
+                </p>
+            </div>
+
+            <!-- Column 2: Transfer Hit Disaster Area -->
+            <div class="bg-rose-950/20 border border-rose-700/40 rounded-2xl p-4 space-y-2">
+                <div class="flex items-center space-x-1.5 text-rose-400 font-bold text-xs uppercase tracking-wider">
+                    <span>📉 TRANSFER MARKET CRIME SCENE</span>
+                </div>
+                <p class="text-xs text-gray-700 dark:text-gray-300 font-serif leading-relaxed">
+                    {{ selected_edition.transfer_hit_roast }}
+                </p>
+            </div>
+
+            <!-- Column 3: Dressing Room Quote -->
+            <div class="bg-purple-950/20 border border-purple-700/40 rounded-2xl p-4 space-y-2 flex flex-col justify-between">
+                <div class="space-y-1">
+                    <div class="flex items-center space-x-1.5 text-purple-400 font-bold text-xs uppercase tracking-wider">
+                        <span>💬 OVERHEARD IN THE DRESSING ROOM</span>
+                    </div>
+                    <blockquote class="text-xs italic text-gray-700 dark:text-gray-200 font-serif pt-1">
+                        {{ selected_edition.quote_of_the_week }}
+                    </blockquote>
+                </div>
+                <span class="text-[10px] text-gray-400 font-mono self-end">
+                    — {{ selected_edition.quote_author }}
+                </span>
+            </div>
+
+        </div>
+
+        <!-- GAZETTE CLASSIFIEDS SECTION -->
+        <div class="pt-4 border-t border-dashed border-gray-300 dark:border-gray-800 space-y-3 font-sans">
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-black uppercase tracking-widest text-gray-900 dark:text-white font-serif">
+                    📰 THE GAZETTE CLASSIFIEDS & PUBLIC NOTICES
+                </span>
+                <span class="text-[10px] text-gray-500 font-mono">Rates: 1 Point per Word</span>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+                {% for ad in selected_edition.classified_ads %}
+                <div class="border border-gray-300 dark:border-gray-800 p-3 rounded-xl bg-gray-100/60 dark:bg-gray-900/40 space-y-1">
+                    <div class="font-black text-[11px] uppercase tracking-tight text-gray-900 dark:text-white font-serif">
+                        {{ ad.title }}
+                    </div>
+                    <p class="text-[11px] text-gray-700 dark:text-gray-300 font-serif leading-tight">
+                        {{ ad.desc }}
+                    </p>
+                    <div class="text-[9px] font-mono text-gray-500 pt-1 border-t border-gray-200 dark:border-gray-800">
+                        {{ ad.contact }}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Newspaper Footer Stamp -->
+        <div class="pt-4 border-t-2 border-gray-900 dark:border-gray-300 text-center text-[10px] font-sans text-gray-500 uppercase tracking-wider">
+            <span>Printed & Distributed by FPL Boys Editorial Syndicate • All rights reserved • No tears refunded</span>
+        </div>
+
+    </div>
+    {% else %}
+    <!-- Empty State if no editions published yet -->
+    <div class="bg-gray-900 border border-gray-800 rounded-3xl p-12 text-center space-y-3 shadow-xl">
+        <div class="text-4xl">📰</div>
+        <h3 class="text-lg font-bold text-white">No Gazette Editions Published Yet</h3>
+        <p class="text-xs text-gray-400 max-w-md mx-auto">
+            Once a gameweek finishes and payouts are calculated, the Gazette will automatically publish its weekly issue with brutal performance roasts!
+        </p>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Include html2pdf.js for Snapshot PDF Export -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script>
+    function exportGazettePDF() {
+        const element = document.getElementById('gazette-paper');
+        if (!element) return;
+
+        const btn = document.getElementById('btn-export-pdf');
+        const origText = btn.innerHTML;
+        btn.innerHTML = '<i data-lucide="loader-2" class="w-3.5 h-3.5 mr-1.5 animate-spin"></i> Generating PDF...';
+        lucide.createIcons();
+
+        const opt = {
+            margin: [8, 8, 8, 8],
+            filename: 'FPL_Boys_Gazette_GW{{ selected_edition.gameweek.number|default:"1" }}.pdf',
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+            pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+        };
+
+        html2pdf().set(opt).from(element).save().then(() => {
+            btn.innerHTML = origText;
+            lucide.createIcons();
+        }).catch((err) => {
+            console.error('PDF generation error:', err);
+            btn.innerHTML = origText;
+            lucide.createIcons();
+            alert('Error exporting PDF. You can also use the browser Print (Save as PDF) option.');
+        });
+    }
+</script>
+{% endblock %}
+

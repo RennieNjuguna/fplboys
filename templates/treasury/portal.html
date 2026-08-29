@@ -18,19 +18,28 @@
             </p>
         </div>
 
-        <div class="flex items-center space-x-2.5">
+        <div class="flex flex-wrap items-center gap-2">
+            <!-- Publish / Refresh Gazette Roasts Form -->
+            <form method="POST" action="{% url 'treasurer_portal' %}">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="generate_roasts">
+                <button type="submit" class="inline-flex items-center px-3.5 py-2.5 bg-amber-950/80 hover:bg-amber-900 text-amber-300 text-xs font-bold rounded-xl border border-amber-600/60 shadow transition-all">
+                    <i data-lucide="newspaper" class="w-3.5 h-3.5 mr-1.5"></i> Publish Gazette Roasts
+                </button>
+            </form>
+
             <!-- Sync FPL Action Form -->
             <form method="POST" action="{% url 'treasurer_portal' %}">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="sync_fpl">
-                <button type="submit" class="inline-flex items-center px-4 py-2.5 bg-purple-900 hover:bg-purple-800 text-fpl-green text-xs font-bold rounded-xl border border-purple-700/80 shadow transition-all">
-                    <i data-lucide="refresh-cw" class="w-3.5 h-3.5 mr-2"></i> Sync with FPL
+                <button type="submit" class="inline-flex items-center px-3.5 py-2.5 bg-purple-900 hover:bg-purple-800 text-fpl-green text-xs font-bold rounded-xl border border-purple-700/80 shadow transition-all">
+                    <i data-lucide="refresh-cw" class="w-3.5 h-3.5 mr-1.5"></i> Sync FPL
                 </button>
             </form>
 
             <!-- Lock Admin Session -->
             <a href="{% url 'treasury_lock' %}" class="inline-flex items-center px-3.5 py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs font-bold rounded-xl border border-gray-700 transition-colors">
-                <i data-lucide="lock" class="w-3.5 h-3.5 mr-1.5"></i> Lock Portal
+                <i data-lucide="lock" class="w-3.5 h-3.5 mr-1.5"></i> Lock
             </a>
         </div>
     </div>

@@ -118,6 +118,19 @@ def treasurer_portal_view(request):
                 messages.error(request, f"FPL sync error: {e}")
             return redirect('treasurer_portal')
 
+        elif action == 'generate_roasts':
+            try:
+                from news.services.roast_engine import generate_roast_edition
+                latest_gw = Gameweek.objects.filter(status__in=['finished', 'active']).order_by('-number').first()
+                if latest_gw:
+                    ed = generate_roast_edition(latest_gw, force_update=True)
+                    messages.success(request, f"📰 Published The Gazette Issue #{ed.edition_number} for GW {latest_gw.number}!")
+                else:
+                    messages.warning(request, "No active or finished gameweeks found.")
+            except Exception as e:
+                messages.error(request, f"Error publishing Gazette: {e}")
+            return redirect('treasurer_portal')
+
         elif action == 'disburse_payout':
             member_id = request.POST.get('member_id')
             amount_str = request.POST.get('amount_to_disburse')

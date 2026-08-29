@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     # Local Apps
     'league.apps.LeagueConfig',
     'treasury.apps.TreasuryConfig',
+    'news.apps.NewsConfig',
 ]
 
 MIDDLEWARE = [

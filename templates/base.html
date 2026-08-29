@@ -140,6 +140,15 @@
                     <span class="ml-3 sidebar-text whitespace-nowrap">Financial Ledger</span>
                 </a>
 
+                <!-- The Gazette: News & Brutal Roasts (Public) -->
+                <a href="{% url 'gazette' %}" class="flex items-center px-3 py-2.5 rounded-xl text-sm font-semibold transition-all group {% if request.resolver_match.url_name == 'gazette' %}bg-purple-900/50 text-fpl-green border border-purple-700/60 shadow-sm{% else %}text-gray-300 hover:text-white hover:bg-purple-950/40{% endif %}" title="The Gazette - News & Brutal Roasts">
+                    <i data-lucide="newspaper" class="w-4 h-4 flex-shrink-0 text-amber-400 group-hover:scale-110 transition-transform"></i>
+                    <span class="ml-3 sidebar-text whitespace-nowrap flex items-center justify-between w-full">
+                        <span>The Gazette</span>
+                        <span class="text-[9px] bg-red-950 text-red-400 border border-red-800 px-1.5 py-0.2 rounded font-bold uppercase tracking-widest ml-2">HOT</span>
+                    </span>
+                </a>
+
                 <!-- Treasury Portal (Locked Admin Only) -->
                 <div class="pt-4 pb-1">
                     <div class="px-3 text-[10px] font-bold uppercase tracking-wider text-gray-500 sidebar-text">

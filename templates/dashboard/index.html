@@ -44,6 +44,28 @@
         {% endif %}
     </div>
 
+    <!-- The Gazette Breaking News & Roast Teaser Banner -->
+    <div class="bg-gradient-to-r from-amber-950/70 via-gray-900 to-purple-950/70 border border-amber-500/40 rounded-2xl p-3.5 sm:p-4 shadow-lg flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div class="flex items-center space-x-3 w-full sm:w-auto">
+            <span class="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/50 flex items-center justify-center text-amber-400 text-base font-serif flex-shrink-0">
+                📰
+            </span>
+            <div class="min-w-0">
+                <div class="flex items-center space-x-2">
+                    <span class="text-[10px] bg-red-900 text-red-300 font-bold px-1.5 py-0.5 rounded uppercase tracking-wider">THE GAZETTE</span>
+                    <span class="text-xs font-bold text-white truncate font-serif">Latest Gameweek Roast Edition is Live!</span>
+                </div>
+                <p class="text-[11px] text-gray-400 truncate">
+                    Read the savage performance autopsies, clown ratings, and satirical classifieds.
+                </p>
+            </div>
+        </div>
+        <a href="{% url 'gazette' %}" class="inline-flex items-center px-3.5 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/50 text-xs font-bold rounded-xl transition-all whitespace-nowrap self-end sm:self-center">
+            <span>Read Issue</span>
+            <i data-lucide="arrow-right" class="w-3.5 h-3.5 ml-1"></i>
+        </a>
+    </div>
+
     <!-- 4 High-Impact Pot Metrics (Mobile 2x2 Grid) -->
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
         

@@ -20,6 +20,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('league.urls')),
     path('treasury/', include('treasury.urls')),
+    path('news/', include('news.urls')),
 ]
 
 admin.site.site_header = "FPL Boys Treasury & League Admin"
