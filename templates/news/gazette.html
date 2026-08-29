@@ -293,6 +293,19 @@
 {% endblock %}
 
 {% block extra_js %}
+<style>
+    @media print {
+        @page {
+            margin: 0;
+            size: A4 portrait;
+        }
+        body {
+            margin: 0 !important;
+            padding: 0 !important;
+            background-color: #fdfaf3 !important;
+        }
+    }
+</style>
 <!-- Include html2pdf.js for Snapshot PDF Export -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script>
@@ -306,10 +319,16 @@
         lucide.createIcons();
 
         const opt = {
-            margin: [6, 6, 6, 6],
+            margin: 0,
             filename: 'FPL_Boys_Gazette_GW{{ selected_edition.gameweek.number|default:"1" }}.pdf',
             image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+            html2canvas: { 
+                scale: 2, 
+                useCORS: true, 
+                letterRendering: true,
+                backgroundColor: null,
+                scrollY: 0
+            },
             jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
             pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
         };
