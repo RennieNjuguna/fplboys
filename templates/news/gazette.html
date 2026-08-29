@@ -4,33 +4,33 @@
 {% block title %}The FPL Boys Gazette - Issue #{{ selected_edition.edition_number|default:"1" }} - FPL Boys{% endblock %}
 
 {% block content %}
-<div class="space-y-6 max-w-5xl mx-auto">
+<div class="space-y-4 sm:space-y-6 max-w-5xl mx-auto px-1 sm:px-0">
 
     <!-- Top Action Bar & Edition Switcher -->
-    <div class="bg-gray-900 border border-gray-800 rounded-3xl p-4 sm:p-5 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4">
+    <div class="bg-gray-900 border border-gray-800 rounded-2xl sm:rounded-3xl p-3.5 sm:p-5 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
         
-        <!-- Left: Title & Edition Selector -->
+        <!-- Title & Edition Selector -->
         <div class="flex items-center space-x-3 w-full sm:w-auto">
-            <div class="w-10 h-10 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 text-xl font-serif font-black shadow-inner">
+            <div class="w-10 h-10 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 text-xl font-serif font-black shadow-inner shrink-0">
                 📰
             </div>
-            <div>
-                <h1 class="text-lg sm:text-xl font-black text-white font-serif tracking-wide flex items-center gap-2">
-                    THE FPL BOYZ GAZETTE
-                    <span class="text-[10px] bg-red-950 text-red-400 border border-red-800 px-2 py-0.5 rounded-full font-sans font-bold uppercase tracking-widest animate-pulse">BRUTAL EDITION</span>
+            <div class="min-w-0">
+                <h1 class="text-base sm:text-xl font-black text-white font-serif tracking-wide flex items-center gap-2 truncate">
+                    <span>THE FPL BOYZ GAZETTE</span>
+                    <span class="text-[9px] sm:text-[10px] bg-red-950 text-red-400 border border-red-800 px-1.5 sm:px-2 py-0.5 rounded-full font-sans font-bold uppercase tracking-wider shrink-0 animate-pulse">POST-GW EDITION</span>
                 </h1>
-                <p class="text-xs text-gray-400">
-                    The official satirical tabloid roasted after every gameweek.
+                <p class="text-[11px] sm:text-xs text-gray-400 truncate">
+                    Official weekly broadsheet, match autopsies, and banter.
                 </p>
             </div>
         </div>
 
-        <!-- Right: Edition Dropdown + Export PDF & Print Buttons -->
-        <div class="flex flex-wrap items-center gap-2.5 w-full sm:w-auto justify-end">
+        <!-- Action Controls: Dropdown + Export PDF + Print + Admin Delete -->
+        <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-between sm:justify-end pt-2 sm:pt-0 border-t border-gray-800 sm:border-t-0">
             
             <!-- Edition Selector Dropdown -->
             <form method="GET" action="{% url 'gazette' %}" class="flex items-center">
-                <select name="gw" onchange="this.form.submit()" class="bg-gray-800 border border-purple-700/60 text-white text-xs font-bold rounded-xl px-3 py-2 focus:ring-fpl-green focus:border-fpl-green">
+                <select name="gw" onchange="this.form.submit()" class="bg-gray-800 border border-purple-700/60 text-white text-xs font-bold rounded-xl px-2.5 py-2 focus:ring-fpl-green focus:border-fpl-green cursor-pointer">
                     {% for ed in all_editions %}
                     <option value="{{ ed.edition_number }}" {% if selected_edition and ed.id == selected_edition.id %}selected{% endif %}>
                         Issue #{{ ed.edition_number }} (GW {{ ed.gameweek.number }})
@@ -39,129 +39,131 @@
                 </select>
             </form>
 
-            <!-- Export PDF Button -->
-            <button onclick="exportGazettePDF()" id="btn-export-pdf" class="inline-flex items-center px-3.5 py-2 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white text-xs font-bold rounded-xl shadow-lg transition-all border border-emerald-400/30">
-                <i data-lucide="file-down" class="w-3.5 h-3.5 mr-1.5"></i>
-                <span>Download PDF</span>
-            </button>
-
-            <!-- Print Button -->
-            <button onclick="window.print()" class="inline-flex items-center px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs font-bold rounded-xl border border-gray-700 transition-colors">
-                <i data-lucide="printer" class="w-3.5 h-3.5 mr-1.5"></i>
-                <span>Print</span>
-            </button>
-
-            <!-- Delete Issue Button (Treasury Admin Only) -->
-            {% if is_treasury_unlocked and selected_edition %}
-            <form method="POST" action="{% url 'delete_gazette_edition' selected_edition.id %}" onsubmit="return confirm('Are you sure you want to delete Gazette Issue #{{ selected_edition.edition_number }} (GW {{ selected_edition.gameweek.number }})? This action cannot be undone.');" class="inline">
-                {% csrf_token %}
-                <button type="submit" class="inline-flex items-center px-3 py-2 bg-red-950/80 hover:bg-red-900 text-red-300 text-xs font-bold rounded-xl border border-red-700/80 transition-colors shadow-sm" title="Delete Issue #{{ selected_edition.edition_number }}">
-                    <i data-lucide="trash-2" class="w-3.5 h-3.5 mr-1.5"></i>
-                    <span>Delete Issue</span>
+            <div class="flex items-center gap-2">
+                <!-- Export PDF Button -->
+                <button onclick="exportGazettePDF()" id="btn-export-pdf" class="inline-flex items-center px-3 py-2 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white text-xs font-bold rounded-xl shadow-md transition-all border border-emerald-400/30">
+                    <i data-lucide="file-down" class="w-3.5 h-3.5 mr-1 sm:mr-1.5"></i>
+                    <span>PDF</span>
                 </button>
-            </form>
-            {% endif %}
+
+                <!-- Print Button -->
+                <button onclick="window.print()" class="inline-flex items-center px-2.5 sm:px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs font-bold rounded-xl border border-gray-700 transition-colors">
+                    <i data-lucide="printer" class="w-3.5 h-3.5 mr-1 sm:mr-1.5"></i>
+                    <span class="hidden sm:inline">Print</span>
+                </button>
+
+                <!-- Delete Issue Button (Treasury Admin Only) -->
+                {% if is_treasury_unlocked and selected_edition %}
+                <form method="POST" action="{% url 'delete_gazette_edition' selected_edition.id %}" onsubmit="return confirm('Are you sure you want to delete Gazette Issue #{{ selected_edition.edition_number }} (GW {{ selected_edition.gameweek.number }})?');" class="inline">
+                    {% csrf_token %}
+                    <button type="submit" class="inline-flex items-center px-2.5 sm:px-3 py-2 bg-red-950/80 hover:bg-red-900 text-red-300 text-xs font-bold rounded-xl border border-red-700/80 transition-colors shadow-sm" title="Delete Issue #{{ selected_edition.edition_number }}">
+                        <i data-lucide="trash-2" class="w-3.5 h-3.5 sm:mr-1.5"></i>
+                        <span class="hidden sm:inline">Delete</span>
+                    </button>
+                </form>
+                {% endif %}
+            </div>
 
         </div>
 
     </div>
 
     {% if selected_edition %}
-    <!-- THE NEWSPAPER CONTAINER (Printable & Exportable Area) -->
-    <div id="gazette-paper" class="bg-[#fcfaf2] dark:bg-[#15171e] text-gray-900 dark:text-gray-100 border-4 border-double border-gray-400 dark:border-gray-700 rounded-3xl p-5 sm:p-8 shadow-2xl space-y-6 font-serif relative overflow-hidden">
+    <!-- THE NEWSPAPER CONTAINER (Printable & Mobile-Optimized) -->
+    <div id="gazette-paper" class="bg-[#fdfaf3] dark:bg-[#14161d] text-gray-900 dark:text-gray-100 border-2 sm:border-4 border-double border-gray-400 dark:border-gray-700 rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-2xl space-y-5 sm:space-y-6 font-serif relative overflow-hidden">
         
-        <!-- Retro Paper Background Accent -->
-        <div class="border-b-2 border-gray-900 dark:border-gray-300 pb-3 text-center space-y-2">
+        <!-- Masthead Section -->
+        <div class="border-b-2 border-gray-900 dark:border-gray-300 pb-2 sm:pb-3 text-center space-y-2">
             
-            <!-- Top Tagline -->
-            <div class="flex items-center justify-between text-[9px] sm:text-[11px] font-sans uppercase font-bold tracking-widest text-gray-600 dark:text-gray-400 border-b border-gray-300 dark:border-gray-800 pb-1 px-1">
+            <!-- Top Tagline & Issue Number -->
+            <div class="flex items-center justify-between text-[8px] sm:text-[11px] font-sans uppercase font-bold tracking-widest text-gray-600 dark:text-gray-400 border-b border-gray-300 dark:border-gray-800 pb-1 px-1">
                 <span>✦ "WE ROAST BECAUSE WE CARE" ✦</span>
-                <span class="hidden sm:inline">OFFICIAL LEAGUE TABLOID & CLOWN WATCH</span>
-                <span>VOL. I • NO. {{ selected_edition.edition_number }}</span>
+                <span class="hidden sm:inline">OFFICIAL LEAGUE BROADSHEET & BANTER CHRONICLE</span>
+                <span>VOL. I • ISSUE #{{ selected_edition.edition_number }}</span>
             </div>
 
-            <!-- Main Newspaper Masthead -->
-            <h1 class="text-3xl sm:text-6xl font-black uppercase tracking-tight text-gray-950 dark:text-white font-serif py-1 sm:py-2 select-none">
+            <!-- Main Newspaper Title -->
+            <h1 class="text-2xl sm:text-5xl md:text-6xl font-black uppercase tracking-tight text-gray-950 dark:text-white font-serif py-1 sm:py-2 select-none leading-none">
                 THE FPL BOYZ GAZETTE
             </h1>
 
-            <!-- Masthead Metadata Bar -->
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[10px] sm:text-xs font-sans border-t-2 border-b-2 border-gray-900 dark:border-gray-300 py-1.5 font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                <div>📅 {{ selected_edition.publish_date|date:"D, d M Y" }}</div>
-                <div>💰 Price: Ksh. 150 (Or Podium)</div>
-                <div>📍 Nairobi Bureau</div>
-                <div>⛅ {{ selected_edition.weather_report }}</div>
+            <!-- Masthead Sub-bar (Responsive Flex/Grid) -->
+            <div class="flex flex-wrap items-center justify-between gap-1 text-[9px] sm:text-xs font-sans border-t-2 border-b-2 border-gray-900 dark:border-gray-300 py-1 font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                <span>📅 {{ selected_edition.publish_date|date:"D, d M Y" }}</span>
+                <span class="hidden xs:inline">💰 Entry: Ksh. 150</span>
+                <span>📍 Nairobi Bureau</span>
+                <span class="truncate max-w-[150px] sm:max-w-none">⛅ {{ selected_edition.weather_report }}</span>
             </div>
 
         </div>
 
-        <!-- Breaking News Alert Banner -->
-        <div class="bg-red-600 text-white font-sans text-xs font-bold px-3.5 py-1.5 rounded-lg flex items-center justify-between shadow-sm">
-            <div class="flex items-center space-x-2 truncate">
-                <span class="bg-black text-red-400 px-1.5 py-0.5 rounded text-[10px] uppercase font-black tracking-widest">LATEST WIRE</span>
-                <span class="truncate">{{ selected_edition.headline }}</span>
+        <!-- Breaking Headline Banner -->
+        <div class="bg-red-600 text-white font-sans text-xs font-bold px-3 py-2 rounded-lg flex items-center justify-between shadow-sm">
+            <div class="flex items-center space-x-2 min-w-0">
+                <span class="bg-black text-red-400 px-1.5 py-0.5 rounded text-[9px] uppercase font-black tracking-widest shrink-0">TOP WIRE</span>
+                <span class="truncate text-[11px] sm:text-xs">{{ selected_edition.headline }}</span>
             </div>
-            <span class="hidden sm:inline text-[10px] uppercase tracking-wider text-red-200">Exclusive</span>
+            <span class="hidden sm:inline text-[10px] uppercase tracking-wider text-red-200 shrink-0 ml-2">GW {{ selected_edition.gameweek.number }} Review</span>
         </div>
 
-        <!-- FRONT PAGE LEAD STORY (2 Columns) -->
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 pb-6 border-b border-gray-300 dark:border-gray-800">
+        <!-- FRONT PAGE LEAD STORY & SPOTLIGHT -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-5 pb-5 border-b border-gray-300 dark:border-gray-800">
             
-            <!-- Lead Article (Takes 2 Columns) -->
+            <!-- Lead Editorial Article -->
             <div class="lg:col-span-2 space-y-3">
-                <h2 class="text-xl sm:text-3xl font-black text-gray-950 dark:text-white leading-tight font-serif uppercase">
+                <h2 class="text-lg sm:text-2xl md:text-3xl font-black text-gray-950 dark:text-white leading-tight font-serif uppercase">
                     {{ selected_edition.headline }}
                 </h2>
                 <h3 class="text-xs sm:text-sm font-sans font-semibold text-gray-600 dark:text-gray-400 italic">
                     {{ selected_edition.subheadline }}
                 </h3>
                 
-                <div class="text-[11px] font-sans text-gray-500 dark:text-gray-400 font-bold uppercase pb-1 border-b border-dashed border-gray-300 dark:border-gray-800">
-                    By <span class="text-gray-900 dark:text-gray-200">{{ selected_edition.chief_editor }}</span> • Chief Football & Banter Correspondent
+                <div class="text-[10px] sm:text-[11px] font-sans text-gray-500 dark:text-gray-400 font-bold uppercase pb-1 border-b border-dashed border-gray-300 dark:border-gray-800">
+                    By <span class="text-gray-900 dark:text-gray-200 font-bold">{{ selected_edition.chief_editor }}</span> • League Correspondent
                 </div>
 
-                <!-- Article Body with Drop Cap -->
-                <div class="text-xs sm:text-sm leading-relaxed text-gray-800 dark:text-gray-200 space-y-3 pt-1 text-justify font-serif">
-                    <p class="first-letter:text-4xl first-letter:font-black first-letter:float-left first-letter:mr-2 first-letter:text-amber-600 dark:first-letter:text-amber-400 leading-relaxed">
+                <!-- Editorial Body -->
+                <div class="text-xs sm:text-sm leading-relaxed text-gray-800 dark:text-gray-200 space-y-2 pt-1 font-serif text-justify">
+                    <p class="first-letter:text-3xl sm:first-letter:text-4xl first-letter:font-black first-letter:float-left first-letter:mr-2 first-letter:text-amber-600 dark:first-letter:text-amber-400 leading-relaxed">
                         {{ selected_edition.editorial_lead }}
                     </p>
                 </div>
             </div>
 
-            <!-- Top 2 Spotlight Feature Cards (Clown vs King) -->
-            <div class="space-y-4 font-sans">
+            <!-- Spotlight Feature Cards (Champion & Clown) -->
+            <div class="space-y-3 font-sans">
                 
-                <!-- 👑 King of the Week Card -->
+                <!-- 👑 Gameweek Champion Spotlight Card -->
                 {% if selected_edition.king_of_the_week %}
-                <div class="bg-amber-50 dark:bg-amber-950/30 border-2 border-amber-500/70 rounded-2xl p-4 shadow-md space-y-2">
+                <div class="bg-amber-500/10 border-2 border-amber-500/60 rounded-2xl p-3.5 sm:p-4 shadow-sm space-y-1.5">
                     <div class="flex items-center justify-between">
-                        <span class="text-[10px] font-black uppercase tracking-widest text-amber-800 dark:text-amber-400 bg-amber-200 dark:bg-amber-900/80 px-2 py-0.5 rounded-md">
-                            👑 FLUKE OF THE WEEK
+                        <span class="text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-amber-800 dark:text-amber-400 bg-amber-200 dark:bg-amber-900/80 px-2 py-0.5 rounded-md">
+                            👑 GAMEWEEK CHAMPION
                         </span>
-                        <span class="text-xs font-mono font-bold text-amber-700 dark:text-amber-300">#1 Spot</span>
+                        <span class="text-xs font-mono font-bold text-amber-600 dark:text-amber-400">1st Place</span>
                     </div>
-                    <div class="text-sm sm:text-base font-black text-gray-900 dark:text-white">
+                    <div class="text-sm sm:text-base font-black text-gray-900 dark:text-white font-serif">
                         {{ selected_edition.king_of_the_week.manager_name }}
                     </div>
-                    <p class="text-xs text-gray-700 dark:text-gray-300 leading-snug">
+                    <p class="text-xs text-gray-700 dark:text-gray-300 leading-relaxed font-serif">
                         {{ selected_edition.king_reason }}
                     </p>
                 </div>
                 {% endif %}
 
-                <!-- 🤡 Clown of the Week Card -->
+                <!-- 🤡 Clown of the Gameweek Spotlight Card -->
                 {% if selected_edition.clown_of_the_week %}
-                <div class="bg-rose-50 dark:bg-rose-950/30 border-2 border-rose-600/70 rounded-2xl p-4 shadow-md space-y-2">
+                <div class="bg-rose-500/10 border-2 border-rose-600/60 rounded-2xl p-3.5 sm:p-4 shadow-sm space-y-1.5">
                     <div class="flex items-center justify-between">
-                        <span class="text-[10px] font-black uppercase tracking-widest text-rose-800 dark:text-rose-400 bg-rose-200 dark:bg-rose-900/80 px-2 py-0.5 rounded-md">
-                            🤡 CLOWN OF THE GAMEWEEK
+                        <span class="text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-rose-800 dark:text-rose-400 bg-rose-200 dark:bg-rose-900/80 px-2 py-0.5 rounded-md">
+                            🤡 WOODEN SPOON CLOWN
                         </span>
-                        <span class="text-xs font-mono font-bold text-rose-700 dark:text-rose-300">Wooden Spoon</span>
+                        <span class="text-xs font-mono font-bold text-rose-600 dark:text-rose-400">10th Place</span>
                     </div>
-                    <div class="text-sm sm:text-base font-black text-gray-900 dark:text-white">
+                    <div class="text-sm sm:text-base font-black text-gray-900 dark:text-white font-serif">
                         {{ selected_edition.clown_of_the_week.manager_name }}
                     </div>
-                    <p class="text-xs text-gray-700 dark:text-gray-300 leading-snug">
+                    <p class="text-xs text-gray-700 dark:text-gray-300 leading-relaxed font-serif">
                         {{ selected_edition.clown_reason }}
                     </p>
                 </div>
@@ -171,41 +173,86 @@
 
         </div>
 
-        <!-- MANAGER-BY-MANAGER AUTOPSY GRID -->
-        <div class="space-y-4">
-            <div class="flex items-center justify-between border-b-2 border-gray-900 dark:border-gray-300 pb-1">
-                <h3 class="text-lg sm:text-xl font-black uppercase font-serif tracking-tight text-gray-900 dark:text-white flex items-center space-x-2">
-                    <span>⚔️ THE 10 MANAGERS AUTOPSY REPORT</span>
-                </h3>
-                <span class="text-[10px] sm:text-xs font-sans uppercase text-gray-500 font-bold">Unfiltered Reviews</span>
+        <!-- DISPATCHES & NOTICES BAR (Waivers, Transfer Crime, Quote) -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4 font-sans">
+            
+            <!-- Column 1: Treasurer & Waiver Bulletin -->
+            <div class="bg-amber-500/10 border border-amber-600/30 rounded-2xl p-3.5 space-y-1.5">
+                <div class="flex items-center space-x-1.5 text-amber-500 dark:text-amber-400 font-bold text-xs uppercase tracking-wider">
+                    <span>📢 TREASURY & WAIVER BULLETIN</span>
+                </div>
+                <p class="text-xs text-gray-800 dark:text-gray-200 font-serif leading-relaxed">
+                    {{ selected_edition.defaulter_roast }}
+                </p>
             </div>
 
-            <!-- 2-Column Grid for 10 Managers -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 font-sans">
+            <!-- Column 2: Transfer Market Incident Desk -->
+            <div class="bg-rose-500/10 border border-rose-600/30 rounded-2xl p-3.5 space-y-1.5">
+                <div class="flex items-center space-x-1.5 text-rose-500 dark:text-rose-400 font-bold text-xs uppercase tracking-wider">
+                    <span>📉 TRANSFER MARKET CRIME SCENE</span>
+                </div>
+                <p class="text-xs text-gray-800 dark:text-gray-200 font-serif leading-relaxed">
+                    {{ selected_edition.transfer_hit_roast }}
+                </p>
+            </div>
+
+            <!-- Column 3: Dressing Room Quote -->
+            <div class="bg-purple-500/10 border border-purple-600/30 rounded-2xl p-3.5 space-y-1.5 flex flex-col justify-between">
+                <div>
+                    <div class="flex items-center space-x-1.5 text-purple-400 font-bold text-xs uppercase tracking-wider">
+                        <span>💬 OVERHEARD IN THE TUNNEL</span>
+                    </div>
+                    <blockquote class="text-xs italic text-gray-800 dark:text-gray-200 font-serif pt-1 leading-relaxed">
+                        {{ selected_edition.quote_of_the_week }}
+                    </blockquote>
+                </div>
+                <span class="text-[10px] text-gray-400 font-mono self-end pt-1">
+                    — {{ selected_edition.quote_author }}
+                </span>
+            </div>
+
+        </div>
+
+        <!-- ⚔️ THE 10 MANAGERS PERFORMANCE REVIEW CARDS -->
+        <div class="space-y-3 pt-2">
+            <div class="flex items-center justify-between border-b-2 border-gray-900 dark:border-gray-300 pb-1">
+                <h3 class="text-base sm:text-xl font-black uppercase font-serif tracking-tight text-gray-900 dark:text-white flex items-center space-x-2">
+                    <span>⚔️ THE 10 MANAGERS AUTOPSY & PERFORMANCE REVIEW</span>
+                </h3>
+                <span class="text-[10px] font-sans uppercase text-gray-500 font-bold">Unfiltered</span>
+            </div>
+
+            <!-- Responsive 1-col on mobile, 2-col on tablet/desktop -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 font-sans">
                 {% for item in manager_roasts %}
-                <div class="border border-gray-300 dark:border-gray-800 bg-gray-50/80 dark:bg-gray-900/60 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow space-y-2 flex flex-col justify-between">
+                <div class="border border-gray-300 dark:border-gray-800 bg-white/70 dark:bg-gray-900/60 rounded-2xl p-3.5 sm:p-4 shadow-sm hover:shadow-md transition-shadow space-y-2 flex flex-col justify-between">
                     <div>
-                        <!-- Header: Name, Rank & Badge -->
-                        <div class="flex items-center justify-between gap-2 border-b border-gray-200 dark:border-gray-800 pb-2">
-                            <div>
-                                <h4 class="font-bold text-xs sm:text-sm text-gray-900 dark:text-white font-serif">
-                                    {{ item.member.manager_name }}
-                                </h4>
-                                <span class="text-[10px] text-gray-500 dark:text-gray-400 block truncate">{{ item.member.team_name }}</span>
+                        <!-- Header: Manager Name, Team Name, Points, and Rank Badge -->
+                        <div class="flex items-start justify-between gap-2 border-b border-gray-200 dark:border-gray-800 pb-2">
+                            <div class="min-w-0 flex-1">
+                                <div class="flex items-center gap-1.5">
+                                    <span class="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold font-mono {% if item.rank_in_gw == 1 %}bg-amber-400 text-black{% elif item.rank_in_gw == 2 %}bg-slate-300 text-black{% elif item.rank_in_gw == 3 %}bg-amber-600 text-white{% else %}bg-gray-800 text-gray-300{% endif %}">
+                                        #{{ item.rank_in_gw }}
+                                    </span>
+                                    <h4 class="font-bold text-xs sm:text-sm text-gray-950 dark:text-white font-serif truncate">
+                                        {{ item.member.manager_name }}
+                                    </h4>
+                                </div>
+                                <span class="text-[10px] text-gray-500 dark:text-gray-400 block truncate pl-6.5">{{ item.member.team_name }}</span>
                             </div>
-                            <div class="text-right">
-                                <span class="px-2 py-0.5 rounded text-[10px] font-bold {% if item.rank_in_gw == 1 %}bg-amber-500/20 text-amber-500 border border-amber-500/40{% elif item.rank_in_gw == 2 %}bg-slate-400/20 text-slate-300 border border-slate-400/40{% elif item.rank_in_gw == 3 %}bg-amber-700/20 text-amber-600 border border-amber-700/40{% elif item.rank_in_gw == 10 %}bg-rose-500/20 text-rose-400 border border-rose-500/40{% else %}bg-purple-900/40 text-purple-300 border border-purple-700/40{% endif %}">
+                            <div class="text-right shrink-0">
+                                <span class="px-2 py-0.5 rounded text-[9px] sm:text-[10px] font-bold inline-block {% if item.rank_in_gw == 1 %}bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/40{% elif item.rank_in_gw == 2 %}bg-slate-400/20 text-slate-700 dark:text-slate-300 border border-slate-400/40{% elif item.rank_in_gw == 3 %}bg-amber-700/20 text-amber-700 dark:text-amber-500 border border-amber-700/40{% elif item.rank_in_gw == 10 %}bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/40{% else %}bg-purple-900/30 text-purple-600 dark:text-purple-300 border border-purple-700/40{% endif %}">
                                     {{ item.badge }}
                                 </span>
-                                <div class="text-[11px] font-mono font-black text-gray-900 dark:text-white mt-0.5">
-                                    {{ item.net_points }} pts (Rank #{{ item.rank_in_gw }})
+                                <div class="text-xs font-mono font-black text-gray-900 dark:text-white mt-0.5">
+                                    {{ item.net_points }} pts
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Roast Headline & Body -->
+                        <!-- Story Title & Body -->
                         <div class="pt-2 space-y-1">
-                            <div class="font-black text-xs text-gray-900 dark:text-gray-100 font-serif">
+                            <div class="font-bold text-xs text-gray-950 dark:text-gray-100 font-serif">
                                 {{ item.roast_title }}
                             </div>
                             <p class="text-xs text-gray-700 dark:text-gray-300 leading-relaxed font-serif">
@@ -214,10 +261,10 @@
                         </div>
                     </div>
 
-                    <!-- Stamped Verdict Box -->
-                    <div class="pt-2 mt-2 border-t border-dashed border-gray-300 dark:border-gray-800 flex items-center justify-between text-[11px]">
-                        <span class="font-mono text-[10px] uppercase font-bold text-gray-500">Official Ruling:</span>
-                        <span class="font-mono font-bold text-amber-700 dark:text-amber-400 text-[10px] tracking-tight">
+                    <!-- Stamped Verdict Footer -->
+                    <div class="pt-2 mt-2 border-t border-dashed border-gray-300 dark:border-gray-800 flex items-center justify-between text-[10px]">
+                        <span class="font-mono uppercase font-bold text-gray-500">Official Ruling:</span>
+                        <span class="font-mono font-bold text-amber-700 dark:text-amber-400 tracking-tight">
                             {{ item.verdict }}
                         </span>
                     </div>
@@ -226,74 +273,8 @@
             </div>
         </div>
 
-        <!-- SPECIAL GAZETTE COLUMNS: DEFAULTER ROAST & TRANSFER HITS & QUOTE -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t-2 border-gray-900 dark:border-gray-300 font-sans">
-            
-            <!-- Column 1: Defaulter Watch -->
-            <div class="bg-amber-950/20 border border-amber-700/40 rounded-2xl p-4 space-y-2">
-                <div class="flex items-center space-x-1.5 text-amber-400 font-bold text-xs uppercase tracking-wider">
-                    <span>💸 TREASURER'S BOUNTY DESK</span>
-                </div>
-                <p class="text-xs text-gray-700 dark:text-gray-300 font-serif leading-relaxed">
-                    {{ selected_edition.defaulter_roast }}
-                </p>
-            </div>
-
-            <!-- Column 2: Transfer Hit Disaster Area -->
-            <div class="bg-rose-950/20 border border-rose-700/40 rounded-2xl p-4 space-y-2">
-                <div class="flex items-center space-x-1.5 text-rose-400 font-bold text-xs uppercase tracking-wider">
-                    <span>📉 TRANSFER MARKET CRIME SCENE</span>
-                </div>
-                <p class="text-xs text-gray-700 dark:text-gray-300 font-serif leading-relaxed">
-                    {{ selected_edition.transfer_hit_roast }}
-                </p>
-            </div>
-
-            <!-- Column 3: Dressing Room Quote -->
-            <div class="bg-purple-950/20 border border-purple-700/40 rounded-2xl p-4 space-y-2 flex flex-col justify-between">
-                <div class="space-y-1">
-                    <div class="flex items-center space-x-1.5 text-purple-400 font-bold text-xs uppercase tracking-wider">
-                        <span>💬 OVERHEARD IN THE DRESSING ROOM</span>
-                    </div>
-                    <blockquote class="text-xs italic text-gray-700 dark:text-gray-200 font-serif pt-1">
-                        {{ selected_edition.quote_of_the_week }}
-                    </blockquote>
-                </div>
-                <span class="text-[10px] text-gray-400 font-mono self-end">
-                    — {{ selected_edition.quote_author }}
-                </span>
-            </div>
-
-        </div>
-
-        <!-- GAZETTE CLASSIFIEDS SECTION -->
-        <div class="pt-4 border-t border-dashed border-gray-300 dark:border-gray-800 space-y-3 font-sans">
-            <div class="flex items-center justify-between">
-                <span class="text-xs font-black uppercase tracking-widest text-gray-900 dark:text-white font-serif">
-                    📰 THE GAZETTE CLASSIFIEDS & PUBLIC NOTICES
-                </span>
-                <span class="text-[10px] text-gray-500 font-mono">Rates: 1 Point per Word</span>
-            </div>
-
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
-                {% for ad in selected_edition.classified_ads %}
-                <div class="border border-gray-300 dark:border-gray-800 p-3 rounded-xl bg-gray-100/60 dark:bg-gray-900/40 space-y-1">
-                    <div class="font-black text-[11px] uppercase tracking-tight text-gray-900 dark:text-white font-serif">
-                        {{ ad.title }}
-                    </div>
-                    <p class="text-[11px] text-gray-700 dark:text-gray-300 font-serif leading-tight">
-                        {{ ad.desc }}
-                    </p>
-                    <div class="text-[9px] font-mono text-gray-500 pt-1 border-t border-gray-200 dark:border-gray-800">
-                        {{ ad.contact }}
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-
-        <!-- Newspaper Footer Stamp -->
-        <div class="pt-4 border-t-2 border-gray-900 dark:border-gray-300 text-center text-[10px] font-sans text-gray-500 uppercase tracking-wider">
+        <!-- Newspaper Footer Syndicate Notice -->
+        <div class="pt-3 border-t-2 border-gray-900 dark:border-gray-300 text-center text-[9px] sm:text-[10px] font-sans text-gray-500 uppercase tracking-wider">
             <span>Printed & Distributed by FPL Boys Editorial Syndicate • All rights reserved • No tears refunded</span>
         </div>
 
@@ -304,7 +285,7 @@
         <div class="text-4xl">📰</div>
         <h3 class="text-lg font-bold text-white">No Gazette Editions Published Yet</h3>
         <p class="text-xs text-gray-400 max-w-md mx-auto">
-            Once a gameweek finishes and payouts are calculated, the Gazette is published with brutal performance roasts. Check back shortly!
+            Once a gameweek finishes and payouts are calculated, the Gazette is published by the Treasurer with brutal performance roasts. Check back shortly!
         </p>
     </div>
     {% endif %}
@@ -322,11 +303,11 @@
 
         const btn = document.getElementById('btn-export-pdf');
         const origText = btn.innerHTML;
-        btn.innerHTML = '<i data-lucide="loader-2" class="w-3.5 h-3.5 mr-1.5 animate-spin"></i> Generating PDF...';
+        btn.innerHTML = '<i data-lucide="loader-2" class="w-3.5 h-3.5 mr-1 animate-spin"></i> Exporting...';
         lucide.createIcons();
 
         const opt = {
-            margin: [8, 8, 8, 8],
+            margin: [6, 6, 6, 6],
             filename: 'FPL_Boys_Gazette_GW{{ selected_edition.gameweek.number|default:"1" }}.pdf',
             image: { type: 'jpeg', quality: 0.98 },
             html2canvas: { scale: 2, useCORS: true, letterRendering: true },

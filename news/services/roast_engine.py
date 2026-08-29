@@ -84,16 +84,17 @@ SAMPLE_CLASSIFIEDS = [
 ]
 
 WEATHER_REPORTS = [
-    'Heavy storms over the relegation zone. 100% chance of bench regret and broken dreams.',
-    'Scorching heat at the top of the table. Flukes are expected to cool down rapidly by next weekend.',
-    'Foggy conditions throughout mid-table mediocrity. Zero tactical vision reported across all 10 managers.',
-    'Flash flood warnings: River of tears flowing from managers who took -8 hits for 1 point.',
+    'Clear skies at the top of the table. Relegation zone experiencing severe thunder and tactical depression.',
+    'Scorching heat on the podium. Mid-table floating in thick tactical fog.',
+    'Heavy rain of green arrows for the champion; flash flood of tears in 10th place.',
+    'Crisp footballing conditions across the league with high pressure on the bottom managers.',
 ]
 
 
 def generate_roast_edition(gameweek: Gameweek, force_update=True) -> RoastEdition:
     """
     Analyzes Gameweek results and payments to generate a savage, hilarious newspaper edition.
+    Includes GW1/GW2 fine waiver notices, celebrates winners with swagger, and savages the clowns.
     """
     ensure_news_tables_exist()
     results = list(
@@ -116,61 +117,63 @@ def generate_roast_edition(gameweek: Gameweek, force_update=True) -> RoastEditio
     hit_takers.sort(key=lambda r: r.transfer_cost, reverse=True)
     biggest_hit_taker = hit_takers[0] if hit_takers else None
 
-    # Check defaulters / late payments
-    late_or_unpaid = []
-    for r in results:
-        p = payments.get(r.member_id)
-        if not p:
-            late_or_unpaid.append((r.member, 'UNPAID'))
-        elif p.is_late:
-            late_or_unpaid.append((r.member, 'LATE (+50 Fine)'))
-
     gw_num = gameweek.number
     winner_name = winner_res.member.manager_name.upper()
     last_name = last_res.member.manager_name.upper()
-    headline = f"GW {gw_num} MASSACRE: {winner_name} RIDES BLIND LUCK TO GLORY AS {last_name} ANCHORS THE CLOWN CAR!"
-    subheadline = f"Official Issue #{gw_num}: A comprehensive autopsy of terrible captain choices, catastrophic benching blunders, and BBQ pot donations."
+
+    headline = f"GW {gw_num} CROWN: {winner_name} CLAIMS SUPREME GLORY AS {last_name} ANCHORS THE CLOWN CAR!"
+    subheadline = f"Official Issue #{gw_num}: Masterclass at the summit, carnage at the bottom, and an unfiltered autopsy of the weekend."
 
     # Editorial lead
     editorial_lead = (
-        f"Welcome to Issue #{gw_num} of The FPL Boys Gazette, the only publication brave enough to tell you that your fantasy football acumen is comparable to a blindfolded monkey throwing darts at a fixture list. "
-        f"This week, {winner_res.member.manager_name} ({winner_res.member.team_name}) somehow scraped together {winner_res.net_points} net points to finish atop the podium, proving once again that in this league, pure unadulterated luck beats tactical preparation every single day of the week. "
-        f"Meanwhile at the rock bottom of the abyss, {last_res.member.manager_name} ({last_res.member.team_name}) put on a masterclass in embarrassment with a pitiful {last_res.net_points} points, successfully turning their team into a charity donation for the rest of the 10 managers. "
-        f"Grab your coffee, read through the wreckage, and if your name is near the bottom, please remember to turn off your WhatsApp notifications before the group chat destroys whatever self-esteem you have left."
-    )
-
-    clown_reason = (
-        f"{last_res.member.manager_name} secured rank #{last_res.league_rank} with an astounding {last_res.net_points} points. "
-        f"Scientists are currently studying this performance to determine if it was physically possible to pick a worse lineup. "
-        f"Verdict: Demotion to fantasy chess recommended."
+        f"Welcome to Issue #{gw_num} of The FPL Boys Gazette! "
+        f"Gameweek {gw_num} kicked off with high drama and tactical showdowns across all 10 managers. "
+        f"Leading from the front, {winner_res.member.manager_name} ({winner_res.member.team_name}) put on a championship display, amassing a league-high {winner_res.net_points} points to secure top honors and pocket Ksh. {winner_res.gw_prize_won:,.2f} in prize money. "
+        f"However, for every champion standing proudly on the podium, there is a casualty in the trenches. "
+        f"At the very bottom of the table, {last_res.member.manager_name} ({last_res.member.team_name}) suffered a complete tactical meltdown with only {last_res.net_points} points, officially earning the unwanted wooden spoon. "
+        f"Read through the full breakdown below for the complete manager-by-manager autopsy!"
     )
 
     king_reason = (
-        f"{winner_res.member.manager_name} took top honors with {winner_res.net_points} net points, pocketing Ksh. {winner_res.gw_prize_won:,.2f}. "
-        f"Don't let them convince you this was tactical genius—their captain barely touched the ball and their vice-captain was probably benched in real life. Enjoy the podium while it lasts!"
+        f"{winner_res.member.manager_name} dominated the round with {winner_res.net_points} net points, bagging Ksh. {winner_res.gw_prize_won:,.2f}. "
+        f"An imperious showing that sets the early benchmark for the rest of the league to chase!"
     )
 
-    # Defaulter roast
-    if late_or_unpaid:
-        defaulter_names = ', '.join([f"{m.manager_name} ({status})" for m, status in late_or_unpaid])
+    clown_reason = (
+        f"{last_res.member.manager_name} collapsed to rank #{last_res.league_rank} with just {last_res.net_points} points. "
+        f"A textbook disasterclass that will be studied in tactical defense academies as what NOT to do."
+    )
+
+    # Defaulter roast / waiver rules
+    if gw_num in [1, 2]:
         defaulter_roast = (
-            f"The Treasurer sends special gratitude to our honorary BBQ Pot sponsors: {defaulter_names}. "
-            f"Your inability to pay Ksh. 150 before the deadline has directly funded the nyama choma fund. We thank you for your voluntary financial sacrifice!"
+            f"🚨 LEAGUE GRACE PERIOD (GW {gw_num}): The League Committee has officially waived all late penalty fines for the opening gameweeks! "
+            f"All managers are cleared of late fees for GW 1 and GW 2. Enjoy the amnesty while it lasts—strict Ksh. 50 fines apply starting GW 3!"
         )
     else:
-        defaulter_roast = "In an unprecedented miracle that shocked local economists, all 10 managers actually managed to pay on time. The Treasurer was seen crying tears of joy into their M-Pesa statements."
+        # Check actual late payments
+        late_members = [r.member for r in results if payments.get(r.member_id) and payments.get(r.member_id).is_late]
+        unpaid_members = [r.member for r in results if not payments.get(r.member_id)]
+        if late_members or unpaid_members:
+            names = ', '.join([f"{m.manager_name} ({'LATE' if m in late_members else 'UNPAID'})" for m in (late_members + unpaid_members)])
+            defaulter_roast = (
+                f"Special gratitude to our voluntary BBQ Pot sponsors: {names}. "
+                f"Your contributions to the fine fund are deeply appreciated by the meat committee!"
+            )
+        else:
+            defaulter_roast = "All 10 managers paid on time! The Treasurer extends sincere congratulations to the entire league."
 
     # Hit roast
     if biggest_hit_taker:
         transfer_hit_roast = (
-            f"Special Achievement in Financial Suicide: {biggest_hit_taker.member.manager_name} took a -{biggest_hit_taker.transfer_cost} point hit in transfers, "
-            f"only to finish with {biggest_hit_taker.net_points} net points. That is roughly equivalent to burning a 1,000 shilling note to look for a 50-cent coin in the dark."
+            f"Transfer Market Alert: {biggest_hit_taker.member.manager_name} took a -{biggest_hit_taker.transfer_cost} point hit in transfers, "
+            f"finishing with {biggest_hit_taker.net_points} net points. A costly gamble that did not quite deliver the expected dividends."
         )
     else:
-        transfer_hit_roast = "Nobody took reckless transfer hits this week, robbing the Gazette of its favorite source of cheap comedy. Cowards, all of you."
+        transfer_hit_roast = "Zero transfer hits taken this week. Clean discipline across the entire mini-league!"
 
-    quote_of_the_week = f"\"I swear my team was mathematically optimized by an algorithm.\" — {last_res.member.manager_name} moments before scoring {last_res.net_points} points."
-    quote_author = f"{last_res.member.manager_name} (Chief Tactical Clown)"
+    quote_of_the_week = f"\"My rank is only temporary. By Gameweek 38, they will see the vision.\" — {last_res.member.manager_name}"
+    quote_author = f"{last_res.member.manager_name} (Post-Match Presser)"
 
     weather = random.choice(WEATHER_REPORTS)
 
@@ -182,7 +185,7 @@ def generate_roast_edition(gameweek: Gameweek, force_update=True) -> RoastEditio
                 'headline': headline,
                 'subheadline': subheadline,
                 'publish_date': timezone.now(),
-                'chief_editor': 'The Anonymous League Scribe',
+                'chief_editor': 'The League Scribe & Chief Correspondent',
                 'weather_report': weather,
                 'editorial_lead': editorial_lead,
                 'clown_of_the_week': clown_res.member,
@@ -193,7 +196,7 @@ def generate_roast_edition(gameweek: Gameweek, force_update=True) -> RoastEditio
                 'quote_author': quote_author,
                 'defaulter_roast': defaulter_roast,
                 'transfer_hit_roast': transfer_hit_roast,
-                'classified_ads': SAMPLE_CLASSIFIEDS,
+                'classified_ads': [],
                 'is_published': True,
             }
         )
@@ -207,66 +210,65 @@ def generate_roast_edition(gameweek: Gameweek, force_update=True) -> RoastEditio
             pts = r.net_points
             hits = r.transfer_cost
             manager = r.member
-
             is_last = (r == last_res)
 
             if rank == 1:
-                badge = '👑 1ST PLACE (FLUKE WINNER)'
-                title = f"{manager.manager_name} - King of the Jammy Bastards"
+                badge = '👑 1ST PLACE (CHAMPION)'
+                title = f"{manager.manager_name} - Tactical Masterclass & GW Winner"
                 body = (
-                    f"{manager.manager_name}'s {manager.team_name} somehow scored {pts} points to take 1st place and Ksh. {r.gw_prize_won:,.2f}. "
-                    f"Witnesses report zero tactical strategy—just pure, unadulterated cosmic fortune. Enjoy the bragging rights for the next 48 hours before reality sets in."
+                    f"{manager.manager_name}'s {manager.team_name} delivered a statement performance with a magnificent {pts} points, "
+                    f"clinching 1st place and Ksh. {r.gw_prize_won:,.2f} in prize money. Sharp captaincy and clinical returns gave them total command of the gameweek."
                 )
-                verdict = 'Verdict: Certified Lucky Fraud'
+                verdict = 'Verdict: Certified Baller & League Leader'
             elif is_last and len(results) > 1:
                 badge = '🤡 CLOWN OF THE GAMEWEEK'
                 title = f"{manager.manager_name} - The League Punchline"
                 body = (
                     f"An unforgettable disasterclass of {pts} points to claim the undisputed wooden spoon at rank #{rank}. "
-                    f"Please submit an apology letter to the group chat immediately. Your team didn't just underperform—it committed a footballing crime."
+                    f"Your team didn't just underperform—it committed a footballing felony. Group chat banter is going to be merciless."
                 )
-                verdict = 'Verdict: Delete Team & Start Farming'
+                verdict = 'Verdict: Delete App & Try Checkers'
             elif rank == 2:
-                badge = '🥈 2ND PLACE (FIRST LOSER)'
-                title = f"{manager.manager_name} - The Consolation Prize Prince"
+                badge = '🥈 2ND PLACE (SILVER PODIUM)'
+                title = f"{manager.manager_name} - High-Flying Silver Finish"
                 body = (
-                    f"Scored {pts} points to take 2nd place and Ksh. {r.gw_prize_won:,.2f}. "
-                    f"So close to greatness, yet ultimately just the best of the losers. At least the M-Pesa payout covers lunch."
+                    f"A fantastic round scoring {pts} points to take 2nd place and Ksh. {r.gw_prize_won:,.2f}. "
+                    f"Pushed the champion right down to the final whistle. High-class fantasy management."
                 )
-                verdict = 'Verdict: Bronze Aspirations, Silver Reality'
+                verdict = 'Verdict: Title Contender'
             elif rank == 3:
-                badge = '🥉 3RD PLACE (PODIUM SCRAPPER)'
-                title = f"{manager.manager_name} - Scraped By On Skin of Teeth"
+                badge = '🥉 3RD PLACE (BRONZE PODIUM)'
+                title = f"{manager.manager_name} - Money In The Bank"
                 body = (
-                    f"Managed {pts} points to sneak onto the podium and grab Ksh. {r.gw_prize_won:,.2f}. "
-                    f"One more yellow card from their defender and they would have been in the mid-table wasteland with the commoners."
+                    f"Scored {pts} points to secure the final podium cash prize of Ksh. {r.gw_prize_won:,.2f}. "
+                    f"Solid and effective execution when it mattered most."
                 )
-                verdict = 'Verdict: Barely Acceptable'
+                verdict = 'Verdict: Podium Secured'
             elif 4 <= rank <= 7:
-                badge = '😴 MID-TABLE MEDIOCRITY'
-                title = f"{manager.manager_name} - The Definition of Irrelevance"
-                hit_note = f" (including -{hits} in transfer hits)" if hits > 0 else ""
+                badge = '😴 MID-TABLE PURGATORY'
+                title = f"{manager.manager_name} - Floating in the Middle"
+                hit_note = f" (after -{hits} transfer deduction)" if hits > 0 else ""
                 body = (
-                    f"Scored {pts} net points{hit_note} to settle comfortably into rank #{rank}. "
-                    f"Neither good enough to win cash nor terrible enough to make front-page clown news. Just floating silently in the void of mid-table depression."
+                    f"Recorded {pts} net points{hit_note} to settle into rank #{rank}. "
+                    f"Just a few points away from the podium money. Decent foundation, but needs a sharper captaincy pick to challenge for the top."
                 )
-                verdict = 'Verdict: Emotionally Numb'
+                verdict = 'Verdict: Sleeping Giant'
             elif 8 <= rank <= 9:
-                badge = '💀 RELEGATION TRENCH'
-                title = f"{manager.manager_name} - Dangerously Close to Rock Bottom"
+                badge = '💀 RELEGATION SINKHOLE'
+                title = f"{manager.manager_name} - Dangerously Close to the Bottom"
                 body = (
-                    f"Put up an abysmal {pts} points to land at rank #{rank}. "
-                    f"Fans are already calling for emergency manager sackings. Your defenders conceded, your forwards blanked, and your midfield was basically doing cardio."
+                    f"A difficult round ending with {pts} points at rank #{rank}. "
+                    f"Defenders conceded, forwards blanked, and the bench points are looking painful. Urgent tactical surgery required before next deadline."
                 )
-                verdict = 'Verdict: Sinking Fast'
+                verdict = 'Verdict: Code Red Alert'
             else:
                 badge = '🤡 CLOWN OF THE GAMEWEEK'
                 title = f"{manager.manager_name} - The League Punchline"
                 body = (
-                    f"An unforgettable disasterclass of {pts} points to claim the undisputed wooden spoon at rank #{rank}. "
-                    f"Please submit an apology letter to the group chat immediately. Your team didn't just underperform—it committed a footballing crime."
+                    f"An unforgettable disasterclass of {pts} points at rank #{rank}. "
+                    f"Please submit an apology letter to the group chat immediately."
                 )
-                verdict = 'Verdict: Delete Team & Start Farming'
+                verdict = 'Verdict: Needs Divine Intervention'
 
             ManagerRoastItem.objects.create(
                 edition=edition,
@@ -281,3 +283,4 @@ def generate_roast_edition(gameweek: Gameweek, force_update=True) -> RoastEditio
             )
 
     return edition
+
