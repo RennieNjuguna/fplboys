@@ -120,10 +120,15 @@ def treasurer_portal_view(request):
 
         elif action == 'generate_roasts':
             try:
-                from django.core.management import call_command
-                call_command('migrate', interactive=False)
+                from news.services.roast_engine import ensure_news_tables_exist, generate_roast_edition
+                ensure_news_tables_exist()
 
-                from news.services.roast_engine import generate_roast_edition
+                from django.core.management import call_command
+                try:
+                    call_command('migrate', interactive=False)
+                except Exception:
+                    pass
+
                 gws_with_results = Gameweek.objects.filter(results__isnull=False).distinct().order_by('number')
                 count = 0
                 for gw in gws_with_results:

@@ -2,7 +2,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.http import JsonResponse
 from league.models import Gameweek
 from news.models import RoastEdition, ManagerRoastItem
-from news.services.roast_engine import generate_roast_edition
+from news.services.roast_engine import generate_roast_edition, ensure_news_tables_exist
 
 
 from django.contrib import messages
@@ -12,6 +12,7 @@ def gazette_view(request):
     Renders The FPL Boys Gazette newspaper layout with issue selector,
     breaking news ticker, brutal roast cards, classifieds, and PDF export.
     """
+    ensure_news_tables_exist()
     all_editions = []
     selected_edition = None
     manager_roasts = []

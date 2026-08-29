@@ -1,10 +1,63 @@
 import random
 from decimal import Decimal
 from django.utils import timezone
-from django.db import transaction
+from django.db import connection, transaction
 from league.models import Gameweek, GameweekResult, Member
 from treasury.models import Payment
 from news.models import RoastEdition, ManagerRoastItem
+
+
+def ensure_news_tables_exist():
+    """
+    Guarantees SQLite tables for news models exist even if migrations haven't run on server.
+    """
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute('''
+            CREATE TABLE IF NOT EXISTS "news_roastedition" (
+                "id" integer NOT NULL PRIMARY KEY AUTOINCREMENT,
+                "edition_number" integer NOT NULL UNIQUE,
+                "headline" varchar(255) NOT NULL,
+                "subheadline" varchar(300) NOT NULL,
+                "publish_date" datetime NOT NULL,
+                "chief_editor" varchar(120) NOT NULL,
+                "weather_report" varchar(200) NOT NULL,
+                "editorial_lead" text NOT NULL,
+                "clown_reason" text NOT NULL,
+                "king_reason" text NOT NULL,
+                "quote_of_the_week" text NOT NULL,
+                "quote_author" varchar(120) NOT NULL,
+                "defaulter_roast" text NOT NULL,
+                "transfer_hit_roast" text NOT NULL,
+                "classified_ads_raw" text NOT NULL,
+                "is_published" bool NOT NULL,
+                "created_at" datetime NOT NULL,
+                "updated_at" datetime NOT NULL,
+                "clown_of_the_week_id" bigint NULL REFERENCES "league_member" ("id") DEFERRABLE INITIALLY DEFERRED,
+                "gameweek_id" bigint NOT NULL UNIQUE REFERENCES "league_gameweek" ("id") DEFERRABLE INITIALLY DEFERRED,
+                "king_of_the_week_id" bigint NULL REFERENCES "league_member" ("id") DEFERRABLE INITIALLY DEFERRED
+            );
+            ''')
+            cursor.execute('''
+            CREATE TABLE IF NOT EXISTS "news_managerroastitem" (
+                "id" integer NOT NULL PRIMARY KEY AUTOINCREMENT,
+                "rank_in_gw" integer NOT NULL,
+                "net_points" integer NOT NULL,
+                "badge" varchar(50) NOT NULL,
+                "roast_title" varchar(255) NOT NULL,
+                "roast_body" text NOT NULL,
+                "verdict" varchar(200) NOT NULL,
+                "order" integer NOT NULL,
+                "edition_id" bigint NOT NULL REFERENCES "news_roastedition" ("id") DEFERRABLE INITIALLY DEFERRED,
+                "member_id" bigint NOT NULL REFERENCES "league_member" ("id") DEFERRABLE INITIALLY DEFERRED
+            );
+            ''')
+            cursor.execute('CREATE INDEX IF NOT EXISTS "news_roastedition_clown_of_the_week_id_07bddf93" ON "news_roastedition" ("clown_of_the_week_id");')
+            cursor.execute('CREATE INDEX IF NOT EXISTS "news_roastedition_king_of_the_week_id_0d129dbc" ON "news_roastedition" ("king_of_the_week_id");')
+            cursor.execute('CREATE INDEX IF NOT EXISTS "news_managerroastitem_edition_id_73aea9f1" ON "news_managerroastitem" ("edition_id");')
+            cursor.execute('CREATE INDEX IF NOT EXISTS "news_managerroastitem_member_id_91886d09" ON "news_managerroastitem" ("member_id");')
+    except Exception:
+        pass
 
 
 SAMPLE_CLASSIFIEDS = [
@@ -42,6 +95,7 @@ def generate_roast_edition(gameweek: Gameweek, force_update=True) -> RoastEditio
     """
     Analyzes Gameweek results and payments to generate a savage, hilarious newspaper edition.
     """
+    ensure_news_tables_exist()
     results = list(
         GameweekResult.objects.filter(gameweek=gameweek)
         .select_related('member')
