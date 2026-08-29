@@ -151,6 +151,19 @@ def treasurer_portal_view(request):
                 messages.error(request, f"Error publishing Gazette: {e}")
             return redirect('treasurer_portal')
 
+        elif action == 'delete_issue':
+            edition_id = request.POST.get('edition_id')
+            if edition_id:
+                try:
+                    from news.models import RoastEdition
+                    ed = RoastEdition.objects.get(pk=edition_id)
+                    ed_num = ed.edition_number
+                    ed.delete()
+                    messages.success(request, f"🗑️ Deleted Gazette Issue #{ed_num}.")
+                except Exception as e:
+                    messages.error(request, f"Error deleting issue: {e}")
+            return redirect('treasurer_portal')
+
         elif action == 'disburse_payout':
             member_id = request.POST.get('member_id')
             amount_str = request.POST.get('amount_to_disburse')
@@ -261,6 +274,14 @@ def treasurer_portal_view(request):
             'reinvested': reinvested,
         })
 
+    # Gazette editions list for management
+    gazette_editions = []
+    try:
+        from news.models import RoastEdition
+        gazette_editions = list(RoastEdition.objects.select_related('gameweek').order_by('-edition_number'))
+    except Exception:
+        pass
+
     context = {
         'form': form,
         'all_payments': all_payments,
@@ -269,6 +290,7 @@ def treasurer_portal_view(request):
         'treasury': treasury,
         'members_winnings_list': members_winnings_list,
         'all_gws': all_gws,
+        'gazette_editions': gazette_editions,
     }
     return render(request, 'treasury/portal.html', context)
 

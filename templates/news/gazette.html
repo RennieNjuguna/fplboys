@@ -51,6 +51,17 @@
                 <span>Print</span>
             </button>
 
+            <!-- Delete Issue Button (Treasury Admin Only) -->
+            {% if is_treasury_unlocked and selected_edition %}
+            <form method="POST" action="{% url 'delete_gazette_edition' selected_edition.id %}" onsubmit="return confirm('Are you sure you want to delete Gazette Issue #{{ selected_edition.edition_number }} (GW {{ selected_edition.gameweek.number }})? This action cannot be undone.');" class="inline">
+                {% csrf_token %}
+                <button type="submit" class="inline-flex items-center px-3 py-2 bg-red-950/80 hover:bg-red-900 text-red-300 text-xs font-bold rounded-xl border border-red-700/80 transition-colors shadow-sm" title="Delete Issue #{{ selected_edition.edition_number }}">
+                    <i data-lucide="trash-2" class="w-3.5 h-3.5 mr-1.5"></i>
+                    <span>Delete Issue</span>
+                </button>
+            </form>
+            {% endif %}
+
         </div>
 
     </div>

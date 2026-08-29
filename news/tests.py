@@ -116,3 +116,21 @@ class NewsGazetteTests(TestCase):
         self.assertEqual(data['clown_of_the_week']['name'], "Clown Beta")
         self.assertEqual(len(data['manager_roasts']), 3)
 
+    def test_delete_gazette_edition_by_admin(self):
+        """Test deleting a Gazette edition when authenticated as treasury admin"""
+        edition = generate_roast_edition(self.gw1)
+        self.client.post('/treasury/unlock/', {'password': '@FPLBoyz254??', 'next': '/treasury/portal/'})
+
+        resp = self.client.post(f'/news/delete/{edition.id}/')
+        self.assertEqual(resp.status_code, 302)
+        self.assertFalse(RoastEdition.objects.filter(id=edition.id).exists())
+        self.assertEqual(ManagerRoastItem.objects.filter(edition_id=edition.id).count(), 0)
+
+    def test_delete_gazette_edition_unauthorized(self):
+        """Test unauthenticated guest is redirected when trying to delete an edition"""
+        edition = generate_roast_edition(self.gw1)
+        resp = self.client.post(f'/news/delete/{edition.id}/')
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn('/treasury/unlock/', resp.url)
+        self.assertTrue(RoastEdition.objects.filter(id=edition.id).exists())
+

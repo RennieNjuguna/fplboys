@@ -45,6 +45,21 @@ def gazette_view(request):
     return render(request, 'news/gazette.html', context)
 
 
+from treasury.decorators import treasury_admin_required
+
+@treasury_admin_required
+def delete_gazette_edition_view(request, edition_id):
+    """
+    Deletes a Gazette edition (restricted to Treasury admin).
+    """
+    edition = get_object_or_404(RoastEdition, pk=edition_id)
+    gw_num = edition.gameweek.number
+    edition_num = edition.edition_number
+    edition.delete()
+    messages.success(request, f"🗑️ Deleted Gazette Issue #{edition_num} (GW {gw_num}).")
+    return redirect('gazette')
+
+
 def api_gazette_data(request, edition_num):
     """
     JSON API providing full structured Gazette edition data.
