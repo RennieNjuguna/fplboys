@@ -289,12 +289,20 @@
     </div>
     {% else %}
     <!-- Empty State if no editions published yet -->
-    <div class="bg-gray-900 border border-gray-800 rounded-3xl p-12 text-center space-y-3 shadow-xl">
+    <div class="bg-gray-900 border border-gray-800 rounded-3xl p-8 sm:p-12 text-center space-y-4 shadow-xl">
         <div class="text-4xl">📰</div>
         <h3 class="text-lg font-bold text-white">No Gazette Editions Published Yet</h3>
         <p class="text-xs text-gray-400 max-w-md mx-auto">
             Once a gameweek finishes and payouts are calculated, the Gazette will automatically publish its weekly issue with brutal performance roasts!
         </p>
+        <div class="pt-2 flex flex-wrap items-center justify-center gap-3">
+            <a href="{% url 'generate_gazette' %}" class="inline-flex items-center px-4 py-2 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white text-xs font-bold rounded-xl shadow-lg transition-all">
+                <i data-lucide="zap" class="w-3.5 h-3.5 mr-1.5"></i> Generate Roasts Now
+            </a>
+            <a href="{% url 'treasurer_portal' %}" class="inline-flex items-center px-4 py-2 bg-purple-900/80 hover:bg-purple-800 text-fpl-green text-xs font-bold rounded-xl border border-purple-700 transition-all">
+                <i data-lucide="refresh-cw" class="w-3.5 h-3.5 mr-1.5"></i> Treasurer Sync
+            </a>
+        </div>
     </div>
     {% endif %}
 
