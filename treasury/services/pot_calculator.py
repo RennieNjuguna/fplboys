@@ -46,7 +46,11 @@ def get_treasury_summary():
     # Finished and active gameweeks to date
     finished_or_active_gws = Gameweek.objects.filter(status__in=['finished', 'active'])
     gws_count = finished_or_active_gws.count()
-    expected_total_to_date = Decimal(str(gws_count * settings.EXPECTED_TOTAL_MEMBERS * settings.WEEKLY_CONTRIBUTION))
+    active_members = list(Member.objects.filter(is_active=True))
+    expected_contributions_count = 0
+    for gw in finished_or_active_gws:
+        expected_contributions_count += sum(1 for m in active_members if getattr(m, 'joined_gameweek', 1) <= gw.number)
+    expected_total_to_date = Decimal(str(expected_contributions_count * settings.WEEKLY_CONTRIBUTION))
 
     # Outstanding dues (expected vs actual verified payments)
     outstanding_dues = max(Decimal('0.00'), expected_total_to_date - total_revenue_collected)

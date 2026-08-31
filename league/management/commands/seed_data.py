@@ -11,16 +11,16 @@ from league.services.fpl_client import FPLSyncService
 
 
 SEED_MEMBERS = [
-    {"fpl_entry_id": 3232174, "manager_name": "Marve Mathingu", "team_name": "Marve of the Match", "phone_number": "254712345601"},
-    {"fpl_entry_id": 2473672, "manager_name": "Samuel Wambua", "team_name": "maggry shiners fc", "phone_number": "254712345602"},
-    {"fpl_entry_id": 8619203, "manager_name": "Renny Muragu", "team_name": "The Young Ones", "phone_number": "254712345603"},
-    {"fpl_entry_id": 3079178, "manager_name": "Torque Dennis", "team_name": "DenniSkills", "phone_number": "254712345604"},
-    {"fpl_entry_id": 5249838, "manager_name": "King Chris", "team_name": "The_Painter..", "phone_number": "254712345605"},
-    {"fpl_entry_id": 6866748, "manager_name": "Erick Muchira", "team_name": "mambaaa", "phone_number": "254712345606"},
-    {"fpl_entry_id": 2853582, "manager_name": "Benn Mwangi", "team_name": "Benn's Team", "phone_number": "254712345607"},
-    {"fpl_entry_id": 5622265, "manager_name": "Bright Ottore", "team_name": "Phill Me In FC", "phone_number": "254712345608"},
-    {"fpl_entry_id": 3271390, "manager_name": "Marvin Owino", "team_name": "Don Bosco", "phone_number": "254712345609"},
-    {"fpl_entry_id": 9266887, "manager_name": "Aron Mangati", "team_name": "Arons", "phone_number": "254712345610"},
+    {"fpl_entry_id": 3232174, "manager_name": "Marve Mathingu", "team_name": "Marve of the Match", "phone_number": "254712345601", "joined_gameweek": 1},
+    {"fpl_entry_id": 2473672, "manager_name": "Samuel Wambua", "team_name": "maggry shiners fc", "phone_number": "254712345602", "joined_gameweek": 1},
+    {"fpl_entry_id": 8619203, "manager_name": "Renny Muragu", "team_name": "The Young Ones", "phone_number": "254712345603", "joined_gameweek": 1},
+    {"fpl_entry_id": 3079178, "manager_name": "Torque Dennis", "team_name": "DenniSkills", "phone_number": "254712345604", "joined_gameweek": 1},
+    {"fpl_entry_id": 5249838, "manager_name": "King Chris", "team_name": "The_Painter..", "phone_number": "254712345605", "joined_gameweek": 1},
+    {"fpl_entry_id": 6866748, "manager_name": "Erick Muchira", "team_name": "mambaaa", "phone_number": "254712345606", "joined_gameweek": 1},
+    {"fpl_entry_id": 2853582, "manager_name": "Benn Mwangi", "team_name": "Benn's Team", "phone_number": "254712345607", "joined_gameweek": 1},
+    {"fpl_entry_id": 5622265, "manager_name": "Bright Ottore", "team_name": "Phill Me In FC", "phone_number": "254712345608", "joined_gameweek": 1},
+    {"fpl_entry_id": 3271390, "manager_name": "Marvin Owino", "team_name": "Don Bosco", "phone_number": "254712345609", "joined_gameweek": 1},
+    {"fpl_entry_id": 9266887, "manager_name": "Aron Mangati", "team_name": "Arons", "phone_number": "254712345610", "joined_gameweek": 2},
 ]
 
 GW1_SCORES = {
@@ -33,7 +33,7 @@ GW1_SCORES = {
     2853582: {"pts": 47, "hits": 0, "rank": 4400500},
     5622265: {"pts": 45, "hits": 0, "rank": 4900200},
     3271390: {"pts": 36, "hits": 0, "rank": 6800100},
-    9266887: {"pts": 42, "hits": 0, "rank": 5500000},
+    9266887: {"pts": 0, "hits": 0, "rank": 0},
 }
 
 
@@ -75,6 +75,7 @@ class Command(BaseCommand):
                     'manager_name': m_data['manager_name'],
                     'team_name': m_data['team_name'],
                     'phone_number': m_data['phone_number'],
+                    'joined_gameweek': m_data.get('joined_gameweek', 1),
                     'is_active': True,
                 }
             )

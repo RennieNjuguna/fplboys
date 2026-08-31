@@ -91,10 +91,11 @@ def allocate_payment_with_rollover(
     standard_rate = Decimal('150.00')
     created_payments = []
 
-    # Query candidate gameweeks starting from start_gw.number (or 1)
-    query = Gameweek.objects.all().order_by('number')
+    # Query candidate gameweeks starting from start_gw.number (or member's joined_gameweek)
+    min_gw = getattr(member, 'joined_gameweek', 1)
     if start_gw:
-        query = query.filter(number__gte=start_gw.number)
+        min_gw = max(start_gw.number, min_gw)
+    query = Gameweek.objects.filter(number__gte=min_gw).order_by('number')
 
     candidate_gws = list(query)
 
@@ -220,7 +221,8 @@ def apply_winnings_to_future_gameweeks(member: Member, amount_to_apply: Decimal,
     else:
         # Find earliest unpaid/partial GW
         standard_rate = Decimal('150.00')
-        for gw in Gameweek.objects.all().order_by('number'):
+        min_gw = getattr(member, 'joined_gameweek', 1)
+        for gw in Gameweek.objects.filter(number__gte=min_gw).order_by('number'):
             p = Payment.objects.filter(member=member, gameweek=gw).first()
             if not p or p.amount_paid < standard_rate:
                 start_gw = gw

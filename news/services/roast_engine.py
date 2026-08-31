@@ -95,6 +95,14 @@ def build_personalized_manager_review(manager, rank, pts, hits, prize_won, gw_nu
     name = manager.manager_name
     team = manager.team_name
 
+    # 0. PARDONED / JOINED IN LATER GAMEWEEK
+    if getattr(manager, 'joined_gameweek', 1) > gw_num:
+        badge = f"🆕 JOINED GW {manager.joined_gameweek} (PARDON)"
+        title = f"{name} - Official GW {gw_num} Pardon"
+        body = f"{name} entered the league starting Gameweek {manager.joined_gameweek} and was granted an official committee pardon for GW {gw_num}. Zero points recorded, zero contributions owed, and ready to battle from GW {manager.joined_gameweek} onward!"
+        verdict = f"Verdict: League Pardon / Joined GW {manager.joined_gameweek}"
+        return badge, title, body, verdict
+
     # 1. CHAMPION (Rank 1)
     if rank == 1:
         badge = "👑 1ST PLACE (CHAMPION)"
@@ -258,8 +266,13 @@ def generate_roast_edition(gameweek: Gameweek, force_update=True) -> RoastEditio
 
     payments = {p.member_id: p for p in Payment.objects.filter(gameweek=gameweek, verified=True)}
 
-    winner_res = results[0]
-    last_res = results[-1]
+    active_participants = [r for r in results if getattr(r.member, 'joined_gameweek', 1) <= gameweek.number]
+    if active_participants:
+        winner_res = active_participants[0]
+        last_res = active_participants[-1]
+    else:
+        winner_res = results[0]
+        last_res = results[-1]
     clown_res = last_res
     king_res = winner_res
 

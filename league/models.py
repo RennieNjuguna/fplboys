@@ -18,6 +18,7 @@ class Member(models.Model):
         help_text="Phone number for M-Pesa / reminders (e.g., 254712345678)"
     )
     avatar_url = models.CharField(max_length=400, blank=True, null=True)
+    joined_gameweek = models.IntegerField(default=1, help_text="Gameweek number when the member joined the league")
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

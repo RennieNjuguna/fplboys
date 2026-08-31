@@ -28,6 +28,7 @@ def build_financial_ledger_matrix(max_gws=38):
             'paid_count': 0,
             'late_count': 0,
             'unpaid_count': 0,
+            'expected_count': sum(1 for m in members if getattr(m, 'joined_gameweek', 1) <= gw.number),
         }
         for gw in gameweeks
     }
@@ -44,12 +45,18 @@ def build_financial_ledger_matrix(max_gws=38):
             payment = all_payments.get((member.id, gw.id))
             gw_res = all_results.get((member.id, gw.id))
 
-            is_due = (gw.status in ['finished', 'active']) or (gw.deadline_time and now > gw.deadline_time)
+            is_pardon = (gw.number < getattr(member, 'joined_gameweek', 1))
+            is_due = not is_pardon and ((gw.status in ['finished', 'active']) or (gw.deadline_time and now > gw.deadline_time))
             prize_won = Decimal(str(gw_res.gw_prize_won)) if gw_res else Decimal('0.00')
             net_points = gw_res.net_points if gw_res else 0
 
             standard_due = Decimal('150.00')
-            if payment:
+            if is_pardon:
+                amount_paid = Decimal('0.00')
+                late_fine = Decimal('0.00')
+                balance_due = Decimal('0.00')
+                status = 'PARDON'
+            elif payment:
                 amount_paid = payment.amount_paid
                 late_fine = payment.late_fine_amount if payment.is_late else Decimal('0.00')
                 balance_due = max(Decimal('0.00'), standard_due - amount_paid)

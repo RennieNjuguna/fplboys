@@ -78,6 +78,10 @@
                     </div>
                     <div class="flex items-center space-x-1.5 bg-purple-950/70 border border-purple-800/80 px-2 py-0.5 rounded-lg text-purple-300">
                         <span class="w-1.5 h-1.5 rounded-full bg-purple-400"></span>
+                        <span class="font-semibold">Pardon (Joined Late)</span>
+                    </div>
+                    <div class="flex items-center space-x-1.5 bg-purple-950/70 border border-purple-800/80 px-2 py-0.5 rounded-lg text-purple-300">
+                        <span class="w-1.5 h-1.5 rounded-full bg-purple-400"></span>
                         <span class="font-semibold">Waiver (No fine)</span>
                     </div>
 
@@ -135,7 +139,7 @@
 
                             <!-- GW Cells -->
                             {% for cell in row.cells %}
-                            <td class="px-1.5 sm:px-2 py-2 sm:py-2.5 text-center border-r border-gray-800/40 {% if cell.status == 'PAID' %}bg-emerald-950/30 text-emerald-300{% elif cell.status == 'PARTIAL' %}bg-amber-950/20 text-amber-300{% elif cell.status == 'LATE' %}bg-amber-950/40 text-amber-300{% elif cell.status == 'UNPAID' %}bg-rose-950/40 text-rose-300{% else %}bg-gray-900/30 text-gray-600{% endif %}">
+                            <td class="px-1.5 sm:px-2 py-2 sm:py-2.5 text-center border-r border-gray-800/40 {% if cell.status == 'PAID' %}bg-emerald-950/30 text-emerald-300{% elif cell.status == 'PARTIAL' %}bg-amber-950/20 text-amber-300{% elif cell.status == 'LATE' %}bg-amber-950/40 text-amber-300{% elif cell.status == 'UNPAID' %}bg-rose-950/40 text-rose-300{% elif cell.status == 'PARDON' %}bg-purple-950/30 text-purple-300{% else %}bg-gray-900/30 text-gray-600{% endif %}">
                                 
                                 {% if cell.status == 'PAID' %}
                                 <div class="font-bold text-[10px] sm:text-[11px] text-emerald-300">
@@ -172,6 +176,12 @@
                                 </div>
                                 <div class="text-[8px] text-rose-300/80">Ksh. 150</div>
 
+                                {% elif cell.status == 'PARDON' %}
+                                <div class="font-bold text-[10px] sm:text-[11px] text-purple-300">
+                                    Pardon
+                                </div>
+                                <div class="text-[8px] text-purple-400/90 font-semibold" title="Joined in GW {{ row.member.joined_gameweek }}. Excused from contribution.">Joined GW{{ row.member.joined_gameweek }}</div>
+
                                 {% else %}
                                 <span class="text-gray-600">-</span>
                                 {% endif %}
@@ -201,7 +211,7 @@
                                     {{ col.total_collected|floatformat:0 }}
                                 </div>
                                 <div class="text-[9px] sm:text-[10px] text-fpl-green font-semibold">
-                                    {{ col.paid_count }}/10 paid
+                                    {{ col.paid_count }}/{{ col.expected_count|default:10 }} paid
                                 </div>
                                 {% else %}
                                 <span class="text-gray-600 font-normal">-</span>

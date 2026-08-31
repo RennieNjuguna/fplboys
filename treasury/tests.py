@@ -517,6 +517,23 @@ class TreasuryFinancialTests(TestCase):
         self.assertAlmostEqual(data['balance_due'], 66.67, places=2)
         self.assertAlmostEqual(data['recommended_amount'], 66.67, places=2)
 
+    def test_member_joined_gw2_pardon_in_matrix(self):
+        """
+        Member who joined in GW2 has status 'PARDON' for GW1, 0 balance due, and not counted in unpaid.
+        """
+        self.m2.joined_gameweek = 2
+        self.m2.save()
+
+        matrix = build_financial_ledger_matrix(max_gws=3)
+        m2_row = [r for r in matrix['rows'] if r['member'].id == self.m2.id][0]
+        gw1_cell = m2_row['cells'][0]
+
+        self.assertEqual(gw1_cell['status'], 'PARDON')
+        self.assertEqual(gw1_cell['balance_due'], Decimal('0.00'))
+        self.assertEqual(gw1_cell['amount_paid'], Decimal('0.00'))
+        self.assertFalse(gw1_cell['is_due'])
+        self.assertEqual(m2_row['unpaid_count'], 2)  # GW2 and GW3 (since both are finished in setup)
+
 
 
 

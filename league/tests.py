@@ -140,3 +140,25 @@ class PayoutEngineTests(TestCase):
 
         self.assertEqual(res_3.league_rank, 3)
         self.assertEqual(res_3.gw_prize_won, Decimal('83.33'))
+
+    def test_member_joined_gw2_ineligible_for_gw1_prize(self):
+        gw1 = Gameweek.objects.create(
+            number=1,
+            name="Gameweek 1",
+            deadline_time=self.deadline,
+            status='finished',
+            prize_pool_amount=Decimal('500.00')
+        )
+        # Member 1 joined in GW2
+        self.members[0].joined_gameweek = 2
+        self.members[0].save()
+
+        # Member 1 has a result for GW1
+        GameweekResult.objects.create(
+            member=self.members[0],
+            gameweek=gw1,
+            gw_points=0,
+            transfer_cost=0
+        )
+        from league.services.payout_engine import is_member_eligible_for_prize
+        self.assertFalse(is_member_eligible_for_prize(self.members[0], gw1))

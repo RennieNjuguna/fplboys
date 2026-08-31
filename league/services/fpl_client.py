@@ -194,7 +194,19 @@ class FPLSyncService:
             current_events = {item['event']: item for item in history['current']}
 
             for gw in gameweeks:
-                if gw.number in current_events:
+                if gw.number < member.joined_gameweek:
+                    gw_res, _ = GameweekResult.objects.update_or_create(
+                        member=member,
+                        gameweek=gw,
+                        defaults={
+                            'gw_points': 0,
+                            'transfer_cost': 0,
+                            'net_points': 0,
+                            'overall_rank': 0,
+                        }
+                    )
+                    updated_results_count += 1
+                elif gw.number in current_events:
                     ev_data = current_events[gw.number]
                     points = ev_data.get('points', 0)
                     transfers_cost = ev_data.get('event_transfers_cost', 0)
