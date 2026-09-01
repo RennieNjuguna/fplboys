@@ -15,18 +15,18 @@ BASE_PRIZES = [
 
 def is_member_eligible_for_prize(member, gameweek: Gameweek) -> bool:
     """
-    Rule: One cannot win if they contributed late or did not contribute.
-    Members who had not yet joined the league for this gameweek are not eligible.
-    GW1, GW2, GW19, and GW38 have fine waivers, so any verified payment is considered on-time.
-    For standard GWs, payment must exist, be verified, and NOT be late (is_late=False).
+    Prize Eligibility Rules:
+    1. Members who had not yet joined the league for this gameweek are ineligible (e.g. Aron joined in GW2, so ineligible for GW1).
+    2. GW 1, GW 2, GW 19, and GW 38 have automatic fine and penalty waivers, so all joined members are eligible to win prizes even if their contribution was not yet logged.
+    3. For standard gameweeks, payment must exist, be verified, and NOT be late (is_late=False).
     """
     if gameweek.number < getattr(member, 'joined_gameweek', 1):
         return False
+    if gameweek.number in WAIVED_FINE_GAMEWEEKS:
+        return True
     payment = Payment.objects.filter(member=member, gameweek=gameweek, verified=True).first()
     if not payment:
         return False
-    if gameweek.number in WAIVED_FINE_GAMEWEEKS:
-        return True
     return not payment.is_late
 
 
