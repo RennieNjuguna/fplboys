@@ -43,8 +43,16 @@ def application(environ, start_response):
     except Exception as e:
         logs.append(f"❌ Migration error: {e}")
 
+    # 3. Optional Treasury Reset & Seed
+    query_str = environ.get('QUERY_STRING', '')
+    if 'reset_treasury' in query_str or 'reset_all' in query_str:
+        try:
+            call_command('reset_treasury_ledger')
+            logs.append("✅ Treasury ledger cleanly reset and payments re-seeded.")
+        except Exception as e:
+            logs.append(f"❌ Reset treasury error: {e}")
 
-    # 2. Collect Static Files
+    # 4. Collect Static Files
     try:
         call_command('collectstatic', interactive=False, clear=True)
         logs.append(f"✅ Static files collected into: {settings.STATIC_ROOT}")
