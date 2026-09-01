@@ -212,7 +212,7 @@
                                 Ksh. {{ item.balance_due|floatformat:0 }}
                             </span>
                             <span class="text-[9px] {% if flagged_summary.is_within_24h %}text-amber-400{% else %}text-gray-500{% endif %} block mt-0.5">
-                                {% if item.is_partial %}Partial (Bal {{ item.balance_due|floatformat:0 }}){% elif flagged_summary.is_within_24h %}💣 At Risk{% else %}Pending{% endif %}
+                                {% if item.is_partial %}Partial (Paid Ksh. {{ item.amount_paid|floatformat:0 }} • Bal Ksh. {{ item.balance_due|floatformat:0 }}){% elif flagged_summary.is_within_24h %}💣 At Risk{% else %}Pending{% endif %}
                             </span>
                         </div>
                     </div>

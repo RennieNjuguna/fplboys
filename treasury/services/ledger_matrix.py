@@ -323,17 +323,7 @@ def get_active_gw_flagged_summary(target_gw_num=None):
                 'status_label': 'Paid (Advance)' if is_advance else 'Paid (On Time)',
             })
         elif paid > Decimal('0.00'):
-            # Partial payment
-            current_gw_cleared.append({
-                'member': member,
-                'amount_paid': paid,
-                'payment': payment,
-                'is_advance': True,
-                'is_late': False,
-                'mpesa_code': payment.mpesa_code if payment else None,
-                'timestamp': payment.timestamp_received if payment else None,
-                'status_label': f'Partial (Ksh. {paid:,.0f} / 150)',
-            })
+            # Partial payment - strictly in pending with remaining balance due
             bal = standard_fee - paid
             current_gw_pending.append({
                 'member': member,
