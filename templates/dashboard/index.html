@@ -66,62 +66,34 @@
         </a>
     </div>
 
-    <!-- 4 High-Impact Pot Metrics (Mobile 2x2 Grid) -->
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
+    <!-- 2 High-Impact Pot Metrics (BBQ Pot & Jackpot Pot) -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
         
         <!-- BBQ Pot -->
-        <div class="bg-gray-900/90 border border-amber-500/30 rounded-2xl p-3.5 sm:p-5 shadow-lg relative overflow-hidden group hover:border-amber-500/60 transition-all">
+        <div class="bg-gray-900/90 border border-amber-500/30 rounded-2xl p-4 sm:p-5 shadow-lg relative overflow-hidden group hover:border-amber-500/60 transition-all">
             <div class="flex items-center justify-between">
-                <span class="text-[10px] sm:text-xs font-bold text-amber-400 uppercase tracking-wider">🍖 BBQ Pot</span>
-                <span class="text-xs sm:text-sm">🔥</span>
+                <span class="text-[11px] sm:text-xs font-bold text-amber-400 uppercase tracking-wider">🍖 BBQ Pot</span>
+                <span class="text-sm sm:text-base">🔥</span>
             </div>
-            <div class="text-lg sm:text-3xl font-black text-white mt-1 sm:mt-2">
+            <div class="text-xl sm:text-3xl font-black text-white mt-1 sm:mt-2">
                 Ksh. {{ treasury.total_bbq_pot|floatformat:0|intcomma }}
             </div>
             <div class="text-[10px] sm:text-[11px] text-amber-300/80 mt-0.5 sm:mt-1 truncate">
-                Base: {{ treasury.bbq_standard_portion|floatformat:0 }} | <span class="text-amber-400 font-bold">+{{ treasury.bbq_fines_portion|floatformat:0 }} Fines</span>
+                Base: Ksh. {{ treasury.bbq_standard_portion|floatformat:0 }} | <span class="text-amber-400 font-bold">+Ksh. {{ treasury.bbq_fines_portion|floatformat:0 }} Fines</span>
             </div>
         </div>
 
         <!-- Jackpot Pot -->
-        <div class="bg-gray-900/90 border border-purple-500/30 rounded-2xl p-3.5 sm:p-5 shadow-lg relative overflow-hidden group hover:border-purple-500/60 transition-all">
+        <div class="bg-gray-900/90 border border-purple-500/30 rounded-2xl p-4 sm:p-5 shadow-lg relative overflow-hidden group hover:border-purple-500/60 transition-all">
             <div class="flex items-center justify-between">
-                <span class="text-[10px] sm:text-xs font-bold text-purple-400 uppercase tracking-wider">🏆 Jackpot Pot</span>
-                <span class="text-xs sm:text-sm">🥇</span>
+                <span class="text-[11px] sm:text-xs font-bold text-purple-400 uppercase tracking-wider">🏆 Jackpot Pot</span>
+                <span class="text-sm sm:text-base">🥇</span>
             </div>
-            <div class="text-lg sm:text-3xl font-black text-white mt-1 sm:mt-2">
+            <div class="text-xl sm:text-3xl font-black text-white mt-1 sm:mt-2">
                 Ksh. {{ treasury.total_jackpot_pot|floatformat:0|intcomma }}
             </div>
             <div class="text-[10px] sm:text-[11px] text-purple-300/80 mt-0.5 sm:mt-1 truncate">
-                Season podium fund
-            </div>
-        </div>
-
-        <!-- Weekly Prizes -->
-        <div class="bg-gray-900/90 border border-emerald-500/30 rounded-2xl p-3.5 sm:p-5 shadow-lg relative overflow-hidden group hover:border-emerald-500/60 transition-all">
-            <div class="flex items-center justify-between">
-                <span class="text-[10px] sm:text-xs font-bold text-emerald-400 uppercase tracking-wider">💰 Weekly Prizes</span>
-                <span class="text-xs sm:text-sm">💵</span>
-            </div>
-            <div class="text-lg sm:text-3xl font-black text-white mt-1 sm:mt-2">
-                Ksh. {{ treasury.total_prizes_distributed|floatformat:0|intcomma }}
-            </div>
-            <div class="text-[10px] sm:text-[11px] text-emerald-400 mt-0.5 sm:mt-1 truncate">
-                Paid to Top 3 weekly
-            </div>
-        </div>
-
-        <!-- Total Revenue -->
-        <div class="bg-gray-900/90 border border-cyan-500/30 rounded-2xl p-3.5 sm:p-5 shadow-lg relative overflow-hidden group hover:border-cyan-500/60 transition-all">
-            <div class="flex items-center justify-between">
-                <span class="text-[10px] sm:text-xs font-bold text-cyan-400 uppercase tracking-wider">⚡ Total Revenue</span>
-                <span class="text-xs sm:text-sm">📊</span>
-            </div>
-            <div class="text-lg sm:text-3xl font-black text-white mt-1 sm:mt-2">
-                Ksh. {{ treasury.total_revenue_collected|floatformat:0|intcomma }}
-            </div>
-            <div class="text-[10px] sm:text-[11px] text-cyan-300/80 mt-0.5 sm:mt-1 truncate">
-                {{ treasury.verified_payments_count }} Verified Payments
+                Season podium championship fund
             </div>
         </div>
 

@@ -22,23 +22,25 @@ def get_rank_movement_dict(current_rank, prev_rank):
 def dashboard_overview(request):
     """
     Main home dashboard: Sleek leaderboards, live pots summary, and latest podium winners.
-    Automatically advances to the latest finished gameweek, with selector for past GW podiums.
+    Automatically advances to the latest gameweek with results, with selector for past GW podiums.
     """
     treasury = get_treasury_summary()
     leaderboard_financial = get_member_financial_leaderboard()
 
-    # All finished gameweeks
-    finished_gws = list(Gameweek.objects.filter(status='finished').order_by('number'))
-    latest_finished_gw = finished_gws[-1] if finished_gws else None
+    # All gameweeks with results (or finished)
+    available_gws = list(Gameweek.objects.filter(results__isnull=False).distinct().order_by('number'))
+    if not available_gws:
+        available_gws = list(Gameweek.objects.filter(status='finished').order_by('number'))
+    latest_gw = available_gws[-1] if available_gws else None
 
-    # Selected GW for podium (defaults to latest finished GW)
+    # Selected GW for podium (defaults to latest GW with results)
     selected_podium_gw_num = request.GET.get('podium_gw')
-    selected_podium_gw = latest_finished_gw
+    selected_podium_gw = latest_gw
     if selected_podium_gw_num:
         try:
-            selected_podium_gw = Gameweek.objects.get(number=int(selected_podium_gw_num), status='finished')
+            selected_podium_gw = Gameweek.objects.get(number=int(selected_podium_gw_num))
         except (Gameweek.DoesNotExist, ValueError):
-            selected_podium_gw = latest_finished_gw
+            selected_podium_gw = latest_gw
 
     gw_podium = []
     if selected_podium_gw:
@@ -50,11 +52,10 @@ def dashboard_overview(request):
     # Overall Standings with Rank Tracker Arrows
     members = list(Member.objects.filter(is_active=True))
 
-
     # Calculate previous GW cumulative totals to determine previous overall ranks
     prev_totals = {}
-    if len(finished_gws) >= 2:
-        prev_gws = finished_gws[:-1]
+    if len(available_gws) >= 2:
+        prev_gws = available_gws[:-1]
         for m in members:
             pts = GameweekResult.objects.filter(member=m, gameweek__in=prev_gws).aggregate(
                 Sum('net_points')
@@ -68,7 +69,7 @@ def dashboard_overview(request):
 
     standings_summary = []
     for m in members:
-        latest_res = GameweekResult.objects.filter(member=m, gameweek=latest_finished_gw).first() if latest_finished_gw else None
+        latest_res = GameweekResult.objects.filter(member=m, gameweek=latest_gw).first() if latest_gw else None
         latest_gw_net = latest_res.net_points if latest_res else 0
         latest_gw_hits = latest_res.transfer_cost if latest_res else 0
 
@@ -89,9 +90,9 @@ def dashboard_overview(request):
 
     context = {
         'treasury': treasury,
-        'latest_finished_gw': latest_finished_gw,
+        'latest_finished_gw': latest_gw,
         'selected_podium_gw': selected_podium_gw,
-        'finished_gws': finished_gws,
+        'finished_gws': available_gws,
         'gw_podium': gw_podium,
         'current_or_next_gw': current_or_next_gw,
         'standings_summary': standings_summary,

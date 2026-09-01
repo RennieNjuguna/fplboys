@@ -33,8 +33,8 @@ class Member(models.Model):
 
     @property
     def total_overall_points(self):
-        # Sum of net points across finished gameweeks
-        total = self.gw_results.filter(gameweek__status='finished').aggregate(
+        # Sum of net points across finished and active gameweeks
+        total = self.gw_results.filter(gameweek__status__in=['finished', 'active']).aggregate(
             models.Sum('net_points')
         )['net_points__sum']
         return total or 0

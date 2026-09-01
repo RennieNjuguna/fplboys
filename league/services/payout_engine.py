@@ -47,10 +47,16 @@ def calculate_gameweek_payouts(gameweek: Gameweek) -> list:
         for prev_res in prev_gw.results.all():
             prev_ranks[prev_res.member_id] = prev_res.league_rank
 
-    # Map position to base prize
+    # Map position to base prize derived from gameweek.prize_pool_amount (3:2:1 ratio)
+    prize_pool = gameweek.prize_pool_amount or Decimal('500.00')
+    p1 = (prize_pool * Decimal('3') / Decimal('6')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+    p2 = (prize_pool * Decimal('2') / Decimal('6')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+    p3 = prize_pool - p1 - p2
+    base_prizes = [p1, p2, p3]
+
     def get_pos_prize(idx):
-        if idx < len(BASE_PRIZES):
-            return BASE_PRIZES[idx]
+        if idx < len(base_prizes):
+            return base_prizes[idx]
         return Decimal('0.00')
 
     # Assign overall rank to all results (based strictly on points)

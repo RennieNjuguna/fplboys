@@ -16,6 +16,7 @@ FPL_BOOTSTRAP_URL = "https://fantasy.premierleague.com/api/bootstrap-static/"
 FPL_LEAGUE_STANDINGS_URL = "https://fantasy.premierleague.com/api/leagues-classic/{league_id}/standings/"
 FPL_ENTRY_HISTORY_URL = "https://fantasy.premierleague.com/api/entry/{entry_id}/history/"
 FPL_EVENT_LIVE_URL = "https://fantasy.premierleague.com/api/event/{event_id}/live/"
+FPL_FIXTURES_EVENT_URL = "https://fantasy.premierleague.com/api/fixtures/?event={event_id}"
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -37,6 +38,23 @@ class FPLSyncService:
         except Exception as e:
             logger.error(f"Error fetching FPL bootstrap data: {e}")
             return None
+
+    def check_gameweek_fixtures_finished(self, gw_num):
+        """
+        Queries official FPL fixture endpoints for a gameweek event.
+        Returns True if all fixtures in that gameweek are completed (finished / finished_provisional).
+        """
+        url = FPL_FIXTURES_EVENT_URL.format(event_id=gw_num)
+        try:
+            resp = requests.get(url, headers=HEADERS, timeout=self.timeout)
+            resp.raise_for_status()
+            fixtures = resp.json()
+            if not fixtures:
+                return False
+            return all(f.get('finished') or f.get('finished_provisional') for f in fixtures)
+        except Exception as e:
+            logger.warning(f"Could not check fixture status for GW {gw_num}: {e}")
+            return False
 
     def fetch_league_standings(self):
         """Fetch classic league standings for FPL Boys"""
@@ -63,6 +81,7 @@ class FPLSyncService:
     def sync_gameweeks(self, bootstrap_data=None):
         """
         Creates or updates all 38 Gameweeks from FPL bootstrap-static data.
+        Accurately marks gameweeks as finished when all matches conclude.
         """
         if not bootstrap_data:
             bootstrap_data = self.fetch_bootstrap()
@@ -85,14 +104,20 @@ class FPLSyncService:
                 deadline_dt = timezone.now()
 
             # Determine status
-            is_finished = event.get('finished', False)
+            is_finished = event.get('finished', False) or event.get('data_checked', False)
             is_current = event.get('is_current', False)
             is_next = event.get('is_next', False)
 
             if is_finished:
                 status = 'finished'
-            elif is_current or (timezone.now() >= deadline_dt and not is_finished):
-                status = 'active'
+            elif timezone.now() >= deadline_dt:
+                # Deadline has passed: check if all fixtures finished or 3.5 days elapsed
+                if self.check_gameweek_fixtures_finished(gw_num):
+                    status = 'finished'
+                elif timezone.now() >= deadline_dt + timezone.timedelta(days=3, hours=12):
+                    status = 'finished'
+                else:
+                    status = 'active'
             else:
                 status = 'upcoming'
 
@@ -224,8 +249,11 @@ class FPLSyncService:
                     )
                     updated_results_count += 1
 
-        # Now calculate payouts for each synced gameweek
+        # Now check if active gameweeks finished, and calculate payouts for each synced gameweek
         for gw in gameweeks:
+            if gw.status == 'active' and (self.check_gameweek_fixtures_finished(gw.number) or (gw.deadline_time and timezone.now() >= gw.deadline_time + timezone.timedelta(days=3, hours=12))):
+                gw.status = 'finished'
+                gw.save(update_fields=['status'])
             calculate_gameweek_payouts(gw)
 
         AuditLog.objects.create(

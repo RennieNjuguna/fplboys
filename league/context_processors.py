@@ -23,8 +23,10 @@ def league_context(request):
     except Exception:
         treasury_summary = {}
 
+    user = getattr(request, 'user', None)
+    session = getattr(request, 'session', {})
     is_treasury_unlocked = bool(
-        request.user.is_authenticated or request.session.get('treasury_admin_authenticated')
+        (user and user.is_authenticated) or (hasattr(session, 'get') and session.get('treasury_admin_authenticated'))
     )
 
     return {
