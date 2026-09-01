@@ -162,3 +162,91 @@ class PayoutEngineTests(TestCase):
         )
         from league.services.payout_engine import is_member_eligible_for_prize
         self.assertFalse(is_member_eligible_for_prize(self.members[0], gw1))
+
+
+class ManagerProfileViewTests(TestCase):
+    def setUp(self):
+        self.gw1 = Gameweek.objects.create(
+            number=1,
+            name="Gameweek 1",
+            deadline_time=timezone.now() - timedelta(days=7),
+            status='finished'
+        )
+        self.gw2 = Gameweek.objects.create(
+            number=2,
+            name="Gameweek 2",
+            deadline_time=timezone.now() - timedelta(days=1),
+            status='finished'
+        )
+        self.m1 = Member.objects.create(
+            fpl_entry_id=501,
+            manager_name="Alex Ferguson",
+            team_name="Red Devils",
+            phone_number="254700112233"
+        )
+        self.m2 = Member.objects.create(
+            fpl_entry_id=502,
+            manager_name="Pep Guardiola",
+            team_name="City Centurions",
+            phone_number="254700445566"
+        )
+
+        # GW1 Results
+        GameweekResult.objects.create(
+            member=self.m1,
+            gameweek=self.gw1,
+            gw_points=70,
+            transfer_cost=0,
+            league_rank=1,
+            gw_prize_won=Decimal('250.00'),
+            is_top3=True
+        )
+        GameweekResult.objects.create(
+            member=self.m2,
+            gameweek=self.gw1,
+            gw_points=50,
+            transfer_cost=4,
+            league_rank=2,
+            gw_prize_won=Decimal('166.67'),
+            is_top3=True
+        )
+
+        # GW2 Results
+        GameweekResult.objects.create(
+            member=self.m1,
+            gameweek=self.gw2,
+            gw_points=85,
+            transfer_cost=0,
+            league_rank=1,
+            gw_prize_won=Decimal('250.00'),
+            is_top3=True
+        )
+        GameweekResult.objects.create(
+            member=self.m2,
+            gameweek=self.gw2,
+            gw_points=60,
+            transfer_cost=0,
+            league_rank=2,
+            gw_prize_won=Decimal('166.67'),
+            is_top3=True
+        )
+
+    def test_manager_profile_view_success_and_graph_data(self):
+        """Manager profile view returns HTTP 200 and passes valid graph_stats and chart payload JSON"""
+        import json
+        resp = self.client.get(f'/manager/{self.m1.id}/')
+        self.assertEqual(resp.status_code, 200)
+
+        # Context assertions
+        graph_stats = resp.context['graph_stats']
+        self.assertEqual(graph_stats['best_gw_score'], 85)
+        self.assertEqual(graph_stats['best_gw_name'], "GW 2")
+        self.assertEqual(graph_stats['top3_finishes'], 2)
+        self.assertEqual(graph_stats['total_gws'], 2)
+
+        chart_payload = json.loads(resp.context['chart_payload_json'])
+        self.assertEqual(chart_payload['gw_labels'], ["GW 1", "GW 2"])
+        self.assertEqual(chart_payload['manager_net_points'], [70, 85])
+        self.assertEqual(chart_payload['manager_ranks'], [1, 1])
+        self.assertEqual(chart_payload['cumulative_points'], [70, 155])
+

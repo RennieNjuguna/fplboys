@@ -3,7 +3,7 @@ from django.db import transaction
 from django.db.models import Sum
 from django.utils import timezone
 from league.models import Member, Gameweek
-from treasury.models import Payment, AuditLog, PrizePayout
+from treasury.models import Payment, AuditLog, PrizePayout, PaymentTransaction
 
 
 def models_sum(field_name):
@@ -74,20 +74,23 @@ def allocate_payment_with_rollover(
     mpesa_code: str = None,
     notes: str = None,
     verified: bool = True,
-    is_prize: bool = False
+    is_prize: bool = False,
+    transaction_obj: PaymentTransaction = None
 ) -> list:
     """
     Unified payment and prize rollover allocation engine:
-    1. Distributes funds starting at start_gw in increments up to standard Ksh. 150.00 per GW.
-    2. Correctly adds to existing partial payments (e.g. 83.33 + 66.67 = 150.00) without overwriting.
-    3. Automatically cascades any excess funds (> 150.00 or balance excess) forward to subsequent unpaid/partially paid GWs.
-    4. Guarantees no single GW payment exceeds Ksh. 150.00 standard contribution.
-    5. Preserves prize and M-Pesa reference audit trails.
+    1. Records the parent PaymentTransaction capturing the exact incoming payment amount (e.g. Ksh. 400).
+    2. Distributes funds starting at start_gw in increments up to standard Ksh. 150.00 per GW using FIFO.
+    3. Correctly adds to existing partial payments (e.g. 83.33 + 66.67 = 150.00) without overwriting.
+    4. Automatically cascades any excess funds (> 150.00 or balance excess) forward to subsequent unpaid/partially paid GWs.
+    5. Guarantees no single GW payment exceeds Ksh. 150.00 standard contribution.
+    6. Links all per-GW allocation records to the parent PaymentTransaction.
     """
     if timestamp is None:
         timestamp = timezone.now()
 
-    remaining_balance = Decimal(str(total_amount))
+    total_amount_dec = Decimal(str(total_amount))
+    remaining_balance = total_amount_dec
     standard_rate = Decimal('150.00')
     created_payments = []
 
@@ -98,8 +101,22 @@ def allocate_payment_with_rollover(
     query = Gameweek.objects.filter(number__gte=min_gw).order_by('number')
 
     candidate_gws = list(query)
+    start_gw_target = start_gw or (candidate_gws[0] if candidate_gws else None)
 
     with transaction.atomic():
+        if transaction_obj is None:
+            tx_type = 'PRIZE_ROLLOVER' if is_prize else 'MPESA'
+            transaction_obj = PaymentTransaction.objects.create(
+                member=member,
+                amount=total_amount_dec,
+                starting_gameweek=start_gw_target,
+                mpesa_code=mpesa_code or ("PRIZE-WINNINGS" if is_prize else None),
+                timestamp_received=timestamp,
+                transaction_type=tx_type,
+                notes=notes or "",
+                verified=verified
+            )
+
         for gw in candidate_gws:
             if remaining_balance <= Decimal('0.00'):
                 break
@@ -122,6 +139,8 @@ def allocate_payment_with_rollover(
 
                 if timestamp:
                     existing_payment.timestamp_received = timestamp
+
+                existing_payment.transaction = transaction_obj
 
                 if is_prize:
                     if not existing_payment.mpesa_code:
@@ -155,6 +174,7 @@ def allocate_payment_with_rollover(
                     custom_notes = notes or (f"Lump sum payment for GW {start_gw.number}" if (start_gw and is_first) else f"Auto carryover payment")
 
                 new_payment = Payment.objects.create(
+                    transaction=transaction_obj,
                     member=member,
                     gameweek=gw,
                     amount_paid=allocating,
@@ -181,9 +201,11 @@ def allocate_payment_with_rollover(
         start_gw_num = start_gw.number if start_gw else (candidate_gws[0].number if candidate_gws else 1)
         AuditLog.objects.create(
             action='PAYMENT_CREATED',
-            description=f"Processed {source_desc} for {member.manager_name}. Allocated Ksh. {total_amount - remaining_balance:,.2f} across {len(created_payments)} gameweeks starting GW {start_gw_num}.",
+            description=f"Processed {source_desc} for {member.manager_name} (Tx #{transaction_obj.id}). Allocated Ksh. {total_amount_dec - remaining_balance:,.2f} across {len(created_payments)} gameweeks starting GW {start_gw_num}.",
             performed_by='Treasurer'
         )
+
+    return created_payments
 
     return created_payments
 

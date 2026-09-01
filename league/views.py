@@ -236,13 +236,17 @@ def analytics_view(request):
     return render(request, 'dashboard/analytics.html', context)
 
 
+import json
+
+
 def manager_detail_view(request, member_id):
     """
-    Individual Manager performance profile and financial statement.
+    Individual Manager performance profile, personal interactive graph, and financial statement.
     """
     member = get_object_or_404(Member, pk=member_id)
     gw_results = member.gw_results.select_related('gameweek').order_by('gameweek__number')
     payments = member.payments.select_related('gameweek').order_by('gameweek__number')
+    transactions = member.transactions.select_related('starting_gameweek').prefetch_related('allocations', 'allocations__gameweek').order_by('-timestamp_received')
 
     # Aggregates
     total_points = member.total_overall_points
@@ -251,15 +255,109 @@ def manager_detail_view(request, member_id):
     total_fines = member.total_fines_incurred
     net_pl = member.net_profit_loss
 
+    # Gameweek performance data for Chart.js
+    gws_with_results = list(Gameweek.objects.filter(results__isnull=False).distinct().order_by('number'))
+    if not gws_with_results:
+        gws_with_results = list(Gameweek.objects.filter(status__in=['finished', 'active']).order_by('number'))
+
+    gw_labels = []
+    manager_net_points = []
+    manager_gross_points = []
+    manager_transfer_cost = []
+    league_averages = []
+    league_maximums = []
+    manager_ranks = []
+    cumulative_points = []
+    cumulative_averages = []
+
+    running_cum_points = 0
+    running_cum_avg = 0.0
+    times_beat_avg = 0
+    best_gw_score = 0
+    best_gw_name = "N/A"
+    top3_finishes = 0
+
+    for gw in gws_with_results:
+        gw_labels.append(f"GW {gw.number}")
+        
+        # Manager result for this GW
+        res = GameweekResult.objects.filter(member=member, gameweek=gw).first()
+        net_pts = res.net_points if res else 0
+        gross_pts = res.gw_points if res else 0
+        hits = res.transfer_cost if res else 0
+        rank = res.league_rank if res else 0
+
+        manager_net_points.append(net_pts)
+        manager_gross_points.append(gross_pts)
+        manager_transfer_cost.append(hits)
+        manager_ranks.append(rank if rank > 0 else None)
+
+        running_cum_points += net_pts
+        cumulative_points.append(running_cum_points)
+
+        if rank in [1, 2, 3] or (res and res.is_top3):
+            top3_finishes += 1
+
+        if net_pts > best_gw_score:
+            best_gw_score = net_pts
+            best_gw_name = f"GW {gw.number}"
+
+        # League aggregates for this GW
+        league_stats = GameweekResult.objects.filter(gameweek=gw).aggregate(
+            avg_pts=Avg('net_points'),
+            max_pts=Max('net_points')
+        )
+        avg_pts = round(float(league_stats['avg_pts'] or 0), 1)
+        max_pts = league_stats['max_pts'] or 0
+
+        league_averages.append(avg_pts)
+        league_maximums.append(max_pts)
+
+        running_cum_avg += avg_pts
+        cumulative_averages.append(round(running_cum_avg, 1))
+
+        if net_pts > avg_pts:
+            times_beat_avg += 1
+
+    total_gws = len(gws_with_results)
+    avg_score = round(total_points / total_gws, 1) if total_gws > 0 else 0.0
+    beat_avg_pct = round((times_beat_avg / total_gws) * 100) if total_gws > 0 else 0
+
+    chart_payload = {
+        'gw_labels': gw_labels,
+        'manager_net_points': manager_net_points,
+        'manager_gross_points': manager_gross_points,
+        'manager_transfer_cost': manager_transfer_cost,
+        'league_averages': league_averages,
+        'league_maximums': league_maximums,
+        'manager_ranks': manager_ranks,
+        'cumulative_points': cumulative_points,
+        'cumulative_averages': cumulative_averages,
+        'manager_name': member.manager_name,
+    }
+
+    graph_stats = {
+        'best_gw_score': best_gw_score,
+        'best_gw_name': best_gw_name,
+        'avg_score': avg_score,
+        'times_beat_avg': times_beat_avg,
+        'beat_avg_pct': beat_avg_pct,
+        'top3_finishes': top3_finishes,
+        'total_gws': total_gws,
+    }
+
     context = {
         'member': member,
         'gw_results': gw_results,
         'payments': payments,
+        'transactions': transactions,
         'total_points': total_points,
         'total_won': total_won,
         'total_paid': total_paid,
         'total_fines': total_fines,
         'net_pl': net_pl,
+        'chart_payload_json': json.dumps(chart_payload),
+        'graph_stats': graph_stats,
     }
     return render(request, 'dashboard/manager_profile.html', context)
 

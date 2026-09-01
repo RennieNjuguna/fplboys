@@ -220,16 +220,88 @@
         <!-- Right 2 Columns: Full Payments Management Table (CRUD Actions) -->
         <div class="lg:col-span-2 space-y-6">
             
-            <!-- Payments Table with Edit and Delete -->
+            <!-- Payments Table with Tabs for M-Pesa Receipts and GW Allocations -->
             <div class="bg-gray-900 border border-gray-800 rounded-3xl shadow-xl overflow-hidden">
-                <div class="bg-gradient-to-r from-purple-950/60 to-gray-900 px-6 py-4 border-b border-gray-800 flex items-center justify-between">
-                    <h2 class="text-sm font-bold text-white flex items-center">
-                        <i data-lucide="list" class="w-4 h-4 mr-2 text-emerald-400"></i> All Payment Transactions ({{ all_payments.count }})
-                    </h2>
-                    <span class="text-xs text-gray-400">Manage & Audit</span>
+                <div class="bg-gradient-to-r from-purple-950/60 to-gray-900 px-6 py-4 border-b border-gray-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div class="flex items-center space-x-2">
+                        <i data-lucide="list" class="w-4 h-4 text-emerald-400"></i>
+                        <h2 class="text-sm font-bold text-white">Payment Transactions & Allocations</h2>
+                    </div>
+
+                    <!-- View Switcher Tabs -->
+                    <div class="flex items-center bg-gray-950 p-0.5 rounded-xl border border-gray-800 self-start sm:self-auto">
+                        <button type="button" id="btn-portal-receipts" onclick="togglePortalView('receipts')" class="px-3 py-1 rounded-lg text-[11px] font-bold transition-all bg-purple-900 text-fpl-green shadow-sm border border-purple-700/60">
+                            M-Pesa Receipts ({{ all_transactions.count }})
+                        </button>
+                        <button type="button" id="btn-portal-allocations" onclick="togglePortalView('allocations')" class="px-3 py-1 rounded-lg text-[11px] font-bold transition-all text-gray-400 hover:text-white">
+                            GW Allocations ({{ all_payments.count }})
+                        </button>
+                    </div>
                 </div>
 
-                <div class="overflow-x-auto max-h-[500px]">
+                <!-- TABLE 1: M-Pesa Receipts (Actual Transactions with Allocation Breakdowns) -->
+                <div id="portal-view-receipts" class="overflow-x-auto max-h-[500px]">
+                    <table class="w-full text-left text-xs text-gray-300">
+                        <thead class="sticky top-0 bg-gray-850 uppercase text-gray-400 font-bold border-b border-gray-800 z-10">
+                            <tr>
+                                <th class="px-4 py-3">Manager</th>
+                                <th class="px-4 py-3 text-center">Amount</th>
+                                <th class="px-4 py-3">M-Pesa Ref</th>
+                                <th class="px-4 py-3">Gameweek Allocation</th>
+                                <th class="px-4 py-3 text-center">Status</th>
+                                <th class="px-4 py-3 text-right">Time (EAT)</th>
+                                <th class="px-4 py-3 text-center">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-800 font-mono">
+                            {% for tx in all_transactions %}
+                            <tr class="hover:bg-purple-950/20 font-sans">
+                                <td class="px-4 py-3 font-bold text-white">
+                                    {{ tx.member.manager_name }}
+                                </td>
+                                <td class="px-4 py-3 text-center font-mono font-bold text-emerald-400 text-sm">
+                                    Ksh. {{ tx.amount|floatformat:0 }}
+                                </td>
+                                <td class="px-4 py-3 font-mono text-gray-300">
+                                    <span class="text-white font-semibold">{{ tx.mpesa_code|default:"-" }}</span>
+                                    {% if tx.transaction_type == 'PRIZE_ROLLOVER' %}
+                                    <span class="text-[9px] text-purple-400 block font-bold">Prize Rollover</span>
+                                    {% endif %}
+                                </td>
+                                <td class="px-4 py-3 font-mono text-xs text-cyan-300 font-medium">
+                                    {{ tx.allocations_summary_text }}
+                                </td>
+                                <td class="px-4 py-3 text-center">
+                                    {% if tx.is_late %}
+                                    <span class="bg-amber-950 text-amber-300 border border-amber-800 px-2 py-0.5 rounded text-[10px] font-bold">
+                                        Late (+{{ tx.total_fines|floatformat:0 }})
+                                    </span>
+                                    {% else %}
+                                    <span class="bg-emerald-950 text-emerald-300 border border-emerald-800 px-2 py-0.5 rounded text-[10px] font-bold">
+                                        ✓ On Time
+                                    </span>
+                                    {% endif %}
+                                </td>
+                                <td class="px-4 py-3 text-right font-mono text-gray-400 text-[11px]">
+                                    {{ tx.timestamp_received|date:"d M, H:i" }}
+                                </td>
+                                <td class="px-4 py-3 text-center">
+                                    <a href="{% url 'transaction_delete' tx.id %}" class="p-1.5 bg-gray-800 hover:bg-rose-950 text-rose-400 hover:text-rose-300 rounded-lg border border-gray-700 hover:border-rose-800 transition-colors inline-block" title="Delete Transaction & Allocations">
+                                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="7" class="text-center py-6 text-gray-500 font-sans">No M-Pesa transactions recorded yet.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- TABLE 2: GW Allocations (Per-GW Contribution Breakdown) -->
+                <div id="portal-view-allocations" class="overflow-x-auto max-h-[500px] hidden">
                     <table class="w-full text-left text-xs text-gray-300">
                         <thead class="sticky top-0 bg-gray-850 uppercase text-gray-400 font-bold border-b border-gray-800 z-10">
                             <tr>
@@ -238,7 +310,7 @@
                                 <th class="px-4 py-3 text-center">Amount</th>
                                 <th class="px-4 py-3 text-center">Status</th>
                                 <th class="px-4 py-3">M-Pesa Ref</th>
-                                <th class="px-4 py-3 text-right">Time (GMT+3)</th>
+                                <th class="px-4 py-3 text-right">Time (EAT)</th>
                                 <th class="px-4 py-3 text-center">Actions</th>
                             </tr>
                         </thead>
@@ -269,16 +341,14 @@
                                     {{ p.mpesa_code|default:"-" }}
                                 </td>
                                 <td class="px-4 py-3 text-right font-mono text-gray-400 text-[11px]">
-                                    {{ p.timestamp_received|date:"d M, H:i" }} EAT
+                                    {{ p.timestamp_received|date:"d M, H:i" }}
                                 </td>
                                 <td class="px-4 py-3 text-center">
                                     <div class="flex items-center justify-center space-x-1.5">
-                                        <!-- Edit Payment Button -->
-                                        <a href="{% url 'payment_edit' p.id %}" class="p-1.5 bg-gray-800 hover:bg-gray-700 text-cyan-400 rounded-lg border border-gray-700 transition-colors" title="Edit Payment">
+                                        <a href="{% url 'payment_edit' p.id %}" class="p-1.5 bg-gray-800 hover:bg-gray-700 text-cyan-400 rounded-lg border border-gray-700 transition-colors" title="Edit Allocation">
                                             <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
                                         </a>
-                                        <!-- Delete Payment Button -->
-                                        <a href="{% url 'payment_delete' p.id %}" class="p-1.5 bg-gray-800 hover:bg-rose-950 text-rose-400 hover:text-rose-300 rounded-lg border border-gray-700 hover:border-rose-800 transition-colors" title="Delete Payment">
+                                        <a href="{% url 'payment_delete' p.id %}" class="p-1.5 bg-gray-800 hover:bg-rose-950 text-rose-400 hover:text-rose-300 rounded-lg border border-gray-700 hover:border-rose-800 transition-colors" title="Delete Allocation">
                                             <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
                                         </a>
                                     </div>
@@ -286,7 +356,7 @@
                             </tr>
                             {% empty %}
                             <tr>
-                                <td colspan="7" class="text-center py-6 text-gray-500 font-sans">No payments recorded yet.</td>
+                                <td colspan="7" class="text-center py-6 text-gray-500 font-sans">No allocations recorded yet.</td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -504,6 +574,36 @@
             amountInput.value = Math.min(avail, 150.00).toFixed(2);
         } else {
             amountInput.value = '0.00';
+        }
+    }
+
+    function togglePortalView(view) {
+        const viewReceipts = document.getElementById('portal-view-receipts');
+        const viewAllocations = document.getElementById('portal-view-allocations');
+        const btnReceipts = document.getElementById('btn-portal-receipts');
+        const btnAllocations = document.getElementById('btn-portal-allocations');
+
+        const activeClasses = ['bg-purple-900', 'text-fpl-green', 'shadow-sm', 'border', 'border-purple-700/60'];
+        const inactiveClasses = ['text-gray-400', 'hover:text-white'];
+
+        if (view === 'receipts') {
+            viewReceipts.classList.remove('hidden');
+            viewAllocations.classList.add('hidden');
+
+            btnReceipts.classList.remove(...inactiveClasses);
+            btnReceipts.classList.add(...activeClasses);
+
+            btnAllocations.classList.remove(...activeClasses);
+            btnAllocations.classList.add(...inactiveClasses);
+        } else {
+            viewReceipts.classList.add('hidden');
+            viewAllocations.classList.remove('hidden');
+
+            btnAllocations.classList.remove(...inactiveClasses);
+            btnAllocations.classList.add(...activeClasses);
+
+            btnReceipts.classList.remove(...activeClasses);
+            btnReceipts.classList.add(...inactiveClasses);
         }
     }
 

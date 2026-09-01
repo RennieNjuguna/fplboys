@@ -41,6 +41,64 @@ class TreasuryConfig(models.Model):
 WAIVED_FINE_GAMEWEEKS = (1, 2, 19, 38)
 
 
+class PaymentTransaction(models.Model):
+    """
+    Represents an original incoming M-Pesa payment or prize rollover transaction
+    (e.g., Ksh. 400.00 lump-sum paid by a manager in a single transaction).
+    Links to one or more per-Gameweek Payment allocations (e.g. GW1: 150, GW2: 150, GW3: 100).
+    """
+    TRANSACTION_TYPE_CHOICES = (
+        ('MPESA', 'M-Pesa Cash Payment'),
+        ('PRIZE_ROLLOVER', 'Prize Rollover Conversion'),
+        ('MANUAL', 'Manual Adjustment'),
+    )
+
+    member = models.ForeignKey(Member, on_delete=models.CASCADE, related_name='transactions')
+    amount = models.DecimalField(max_digits=10, decimal_places=2, help_text="Total transaction amount received in Ksh.")
+    starting_gameweek = models.ForeignKey(Gameweek, on_delete=models.SET_NULL, null=True, blank=True, related_name='starting_transactions')
+    mpesa_code = models.CharField(max_length=50, blank=True, null=True, help_text="M-Pesa Transaction Code (e.g. QJH78291KL)")
+    timestamp_received = models.DateTimeField(default=timezone.now, help_text="Timestamp when payment was received")
+    transaction_type = models.CharField(max_length=20, choices=TRANSACTION_TYPE_CHOICES, default='MPESA')
+    notes = models.TextField(blank=True, default="")
+    verified = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-timestamp_received', '-created_at']
+        verbose_name = "Payment Transaction"
+        verbose_name_plural = "Payment Transactions"
+
+    def __str__(self):
+        ref_text = f" [{self.mpesa_code}]" if self.mpesa_code else ""
+        return f"{self.member.manager_name} - Ksh. {self.amount}{ref_text} ({self.timestamp_received.strftime('%d %b %H:%M')})"
+
+    @property
+    def is_late(self):
+        """Returns True if any of its allocated GW payments incurred a late fine"""
+        return self.allocations.filter(is_late=True).exists()
+
+    @property
+    def total_fines(self):
+        """Total late fines assessed on this transaction"""
+        total = self.allocations.aggregate(models.Sum('late_fine_amount'))['late_fine_amount__sum']
+        return Decimal(str(total or 0.00))
+
+    @property
+    def allocations_list(self):
+        """Returns ordered list of per-GW allocations"""
+        return self.allocations.select_related('gameweek').order_by('gameweek__number')
+
+    @property
+    def allocations_summary_text(self):
+        """Returns a clean summary string like: GW 1 (150) • GW 2 (150) • GW 3 (100)"""
+        allocs = list(self.allocations_list)
+        if not allocs:
+            gw_num = self.starting_gameweek.number if self.starting_gameweek else 1
+            return f"GW {gw_num} (Ksh. {self.amount:,.0f})"
+        return " • ".join([f"GW {a.gameweek.number} (Ksh. {a.amount_paid:,.0f})" for a in allocs])
+
+
 class Payment(models.Model):
     """
     Represents a weekly contribution payment made by a member for a gameweek.
@@ -48,6 +106,14 @@ class Payment(models.Model):
     Late fine: Ksh. 50 (if timestamp_received > gameweek.deadline_time).
     Waiver: GW1, GW2, GW19, and GW38 have no late fines.
     """
+    transaction = models.ForeignKey(
+        PaymentTransaction,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='allocations',
+        help_text="Parent M-Pesa transaction this allocation belongs to"
+    )
     member = models.ForeignKey(Member, on_delete=models.CASCADE, related_name='payments')
     gameweek = models.ForeignKey(Gameweek, on_delete=models.CASCADE, related_name='payments')
     amount_paid = models.DecimalField(

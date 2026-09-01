@@ -534,6 +534,106 @@ class TreasuryFinancialTests(TestCase):
         self.assertFalse(gw1_cell['is_due'])
         self.assertEqual(m2_row['unpaid_count'], 2)  # GW2 and GW3 (since both are finished in setup)
 
+    def test_active_gw_flagged_summary_defaulters_and_cleared(self):
+        """
+        Test get_active_gw_flagged_summary identifies actually flagged defaulters and cleared members.
+        """
+        from treasury.services.ledger_matrix import get_active_gw_flagged_summary
+
+        # Member 1 pays on time for GW3 (finished)
+        Payment.objects.create(
+            member=self.m1,
+            gameweek=self.gw3,
+            amount_paid=Decimal('150.00'),
+            timestamp_received=self.deadline - timedelta(hours=2),
+            verified=True,
+            mpesa_code="ONTIME"
+        )
+        # Member 2 is unpaid for GW3
+
+        summary = get_active_gw_flagged_summary(target_gw_num=3)
+        self.assertIsNotNone(summary)
+        self.assertEqual(summary['gw'].number, 3)
+        self.assertEqual(summary['cleared_count'], 1)
+        self.assertEqual(summary['flagged_count'], 1)
+        self.assertEqual(summary['cleared_members'][0]['member'], self.m1)
+        self.assertEqual(summary['actually_flagged'][0]['member'], self.m2)
+        self.assertEqual(summary['actually_flagged'][0]['late_fine'], Decimal('50.00'))
+        self.assertEqual(summary['actually_flagged'][0]['total_due'], Decimal('200.00'))
+
+    def test_active_gw_flagged_summary_ticking_bomb(self):
+        """
+        Test get_active_gw_flagged_summary detects Ticking Bomb (<24h to deadline) for upcoming GW.
+        """
+        from treasury.services.ledger_matrix import get_active_gw_flagged_summary
+
+        # Create upcoming GW4 with deadline in 12 hours
+        upcoming_deadline = timezone.now() + timedelta(hours=12)
+        gw4 = Gameweek.objects.create(
+            number=4,
+            name="Gameweek 4",
+            deadline_time=upcoming_deadline,
+            status='upcoming'
+        )
+
+        # Member 1 has paid in advance
+        Payment.objects.create(
+            member=self.m1,
+            gameweek=gw4,
+            amount_paid=Decimal('150.00'),
+            timestamp_received=timezone.now(),
+            verified=True,
+            mpesa_code="ADVANCE"
+        )
+
+        summary = get_active_gw_flagged_summary(target_gw_num=4)
+        self.assertIsNotNone(summary)
+        self.assertEqual(summary['gw_state'], 'ticking_bomb')
+        self.assertTrue(summary['is_within_24h'])
+        self.assertEqual(summary['cleared_count'], 1)
+        self.assertEqual(summary['pending_count'], 1)
+        self.assertEqual(summary['to_be_flagged'][0]['member'], self.m2)
+        self.assertEqual(summary['to_be_flagged'][0]['status_type'], 'TICKING_BOMB')
+        self.assertEqual(summary['to_be_flagged'][0]['balance_due'], Decimal('150.00'))
+
+    def test_lump_sum_400_payment_transaction_creation_and_breakdown(self):
+        """
+        Test that logging a payment of Ksh. 400 creates a single PaymentTransaction of 400,
+        linked to 3 allocations (GW1: 150, GW2: 150, GW3: 100), and visible in manager & portal views.
+        """
+        from treasury.models import PaymentTransaction
+        from treasury.services.payment_allocation import allocate_payment_with_rollover
+
+        created = allocate_payment_with_rollover(
+            member=self.m1,
+            start_gw=self.gw1,
+            total_amount=Decimal('400.00'),
+            timestamp=timezone.now(),
+            mpesa_code="QJH78291KL",
+            notes="400 payment test",
+            verified=True
+        )
+
+        self.assertEqual(len(created), 3)
+        tx = PaymentTransaction.objects.filter(member=self.m1, mpesa_code="QJH78291KL").first()
+        self.assertIsNotNone(tx)
+        self.assertEqual(tx.amount, Decimal('400.00'))
+        self.assertEqual(tx.allocations.count(), 3)
+
+        # Check allocations summary
+        summary_text = tx.allocations_summary_text
+        self.assertIn("GW 1 (Ksh. 150)", summary_text)
+        self.assertIn("GW 2 (Ksh. 150)", summary_text)
+        self.assertIn("GW 3 (Ksh. 100)", summary_text)
+
+        # Check manager profile view shows transaction
+        resp = self.client.get(f'/manager/{self.m1.id}/')
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Ksh. 400")
+        self.assertContains(resp, "QJH78291KL")
+
+
+
 
 
 

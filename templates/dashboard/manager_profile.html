@@ -37,7 +37,7 @@
             </div>
         </div>
 
-        <!-- 4 KPI Badges (2x2 on Mobile) -->
+    <!-- 4 KPI Badges (2x2 on Mobile) -->
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-4 mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-purple-900/40">
             <div class="p-2.5 sm:p-3 bg-gray-800/50 rounded-xl border border-gray-700/50">
                 <span class="text-[10px] sm:text-[11px] text-gray-400 uppercase font-bold">Total Points</span>
@@ -56,6 +56,74 @@
                 <div class="text-lg sm:text-xl font-bold text-amber-300 mt-0.5">Ksh. {{ total_fines|floatformat:0 }}</div>
             </div>
         </div>
+    </div>
+
+    <!-- Personal Performance Analytics Chart -->
+    <div class="bg-gray-900 border border-gray-800 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-xl space-y-4">
+        
+        <!-- Chart Header & Mode Switchers -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-gray-800">
+            <div>
+                <h2 class="text-sm sm:text-base font-black text-white flex items-center">
+                    <i data-lucide="line-chart" class="w-4 h-4 sm:w-5 sm:h-5 mr-2 text-fpl-green"></i>
+                    Personal Gameweek Performance
+                </h2>
+                <p class="text-[11px] sm:text-xs text-gray-400 mt-0.5">
+                    Analyze {{ member.manager_name }}'s weekly score trajectory vs league benchmark.
+                </p>
+            </div>
+
+            <!-- View Switcher Tabs -->
+            <div class="flex items-center bg-gray-850 p-1 rounded-xl border border-gray-800 self-start sm:self-auto">
+                <button id="btn-tab-points" onclick="switchChartMode('points')" class="px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition-all bg-purple-900 text-fpl-green shadow-sm border border-purple-700/60">
+                    Points vs Avg
+                </button>
+                <button id="btn-tab-rank" onclick="switchChartMode('rank')" class="px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition-all text-gray-400 hover:text-white">
+                    Rank Track
+                </button>
+                <button id="btn-tab-cumulative" onclick="switchChartMode('cumulative')" class="px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition-all text-gray-400 hover:text-white">
+                    Cumulative Growth
+                </button>
+            </div>
+        </div>
+
+        <!-- Personal Benchmark KPI Chips -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+            <div class="bg-gray-850/80 border border-gray-800 p-2.5 rounded-xl flex items-center space-x-2">
+                <span class="text-base">🔥</span>
+                <div>
+                    <span class="text-[10px] text-gray-400 font-medium block">Personal Best</span>
+                    <span class="font-mono font-bold text-white">{{ graph_stats.best_gw_score }} pts <span class="text-[10px] text-amber-400">({{ graph_stats.best_gw_name }})</span></span>
+                </div>
+            </div>
+            <div class="bg-gray-850/80 border border-gray-800 p-2.5 rounded-xl flex items-center space-x-2">
+                <span class="text-base">⚡</span>
+                <div>
+                    <span class="text-[10px] text-gray-400 font-medium block">Average / GW</span>
+                    <span class="font-mono font-bold text-fpl-cyan">{{ graph_stats.avg_score }} pts</span>
+                </div>
+            </div>
+            <div class="bg-gray-850/80 border border-gray-800 p-2.5 rounded-xl flex items-center space-x-2">
+                <span class="text-base">🎯</span>
+                <div>
+                    <span class="text-[10px] text-gray-400 font-medium block">Beaten League Avg</span>
+                    <span class="font-mono font-bold text-emerald-400">{{ graph_stats.times_beat_avg }}/{{ graph_stats.total_gws }} GWs ({{ graph_stats.beat_avg_pct }}%)</span>
+                </div>
+            </div>
+            <div class="bg-gray-850/80 border border-gray-800 p-2.5 rounded-xl flex items-center space-x-2">
+                <span class="text-base">🏆</span>
+                <div>
+                    <span class="text-[10px] text-gray-400 font-medium block">Podium Finishes</span>
+                    <span class="font-mono font-bold text-purple-300">{{ graph_stats.top3_finishes }} times</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chart Canvas Container -->
+        <div class="relative h-64 sm:h-80 w-full pt-2">
+            <canvas id="managerPerformanceChart"></canvas>
+        </div>
+
     </div>
 
     <!-- 2 Columns: GW Scores & Financial History -->
@@ -115,16 +183,80 @@
             </div>
         </div>
 
-        <!-- Column 2: Payment History -->
+        <!-- Column 2: Payment History (M-Pesa Receipts & Gameweek Breakdown) -->
         <div class="bg-gray-900 border border-gray-800 rounded-2xl sm:rounded-3xl shadow-xl overflow-hidden">
-            <div class="bg-gray-850 px-4 sm:px-6 py-3.5 sm:py-4 border-b border-gray-800 flex items-center justify-between">
-                <h2 class="text-xs sm:text-sm font-bold text-white flex items-center">
-                    <i data-lucide="receipt" class="w-4 h-4 mr-2 text-emerald-400"></i> Payment Statement
-                </h2>
-                <span class="text-[11px] sm:text-xs text-gray-400">{{ payments.count }} Payments</span>
+            <div class="bg-gray-850 px-4 sm:px-6 py-3 sm:py-3.5 border-b border-gray-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                <div class="flex items-center space-x-2">
+                    <i data-lucide="receipt" class="w-4 h-4 text-emerald-400"></i>
+                    <h2 class="text-xs sm:text-sm font-bold text-white">Payment Statement</h2>
+                </div>
+
+                <!-- View Mode Tabs -->
+                <div class="flex items-center bg-gray-950 p-0.5 rounded-xl border border-gray-800 self-start sm:self-auto">
+                    <button type="button" id="btn-stmt-receipts" onclick="toggleStatementView('receipts')" class="px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all bg-purple-900 text-fpl-green shadow-sm border border-purple-700/60">
+                        M-Pesa Receipts ({{ transactions.count }})
+                    </button>
+                    <button type="button" id="btn-stmt-allocations" onclick="toggleStatementView('allocations')" class="px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all text-gray-400 hover:text-white">
+                        GW Breakdown ({{ payments.count }})
+                    </button>
+                </div>
             </div>
 
-            <div class="overflow-x-auto" style="-webkit-overflow-scrolling: touch;">
+            <!-- VIEW A: Actual M-Pesa Receipts (Exact Payment Transactions) -->
+            <div id="statement-view-receipts" class="overflow-x-auto" style="-webkit-overflow-scrolling: touch;">
+                <table class="w-full text-left text-xs text-gray-300">
+                    <thead class="bg-gray-800/60 uppercase text-gray-400 font-bold border-b border-gray-800 text-[10px] sm:text-xs">
+                        <tr>
+                            <th class="px-3 sm:px-4 py-3">Amount</th>
+                            <th class="px-2 sm:px-4 py-3">M-Pesa Ref</th>
+                            <th class="px-2 sm:px-4 py-3">Gameweek Allocation</th>
+                            <th class="px-2 sm:px-3 py-3 text-center">Status</th>
+                            <th class="px-3 sm:px-4 py-3 text-right">Date</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-800 font-sans text-xs">
+                        {% for tx in transactions %}
+                        <tr class="hover:bg-purple-950/20">
+                            <td class="px-3 sm:px-4 py-3 font-mono font-bold text-emerald-400 text-xs sm:text-sm">
+                                Ksh. {{ tx.amount|floatformat:0 }}
+                            </td>
+                            <td class="px-2 sm:px-4 py-3">
+                                <span class="font-mono text-white font-semibold block text-[11px] sm:text-xs">{{ tx.mpesa_code|default:"-" }}</span>
+                                {% if tx.transaction_type == 'PRIZE_ROLLOVER' %}
+                                <span class="text-[9px] text-purple-300 font-bold block">Prize Rollover</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-2 sm:px-4 py-3">
+                                <span class="font-mono text-[10px] sm:text-[11px] text-cyan-300 font-medium block">
+                                    {{ tx.allocations_summary_text }}
+                                </span>
+                            </td>
+                            <td class="px-2 sm:px-3 py-3 text-center">
+                                {% if tx.is_late %}
+                                <span class="bg-amber-950 text-amber-400 border border-amber-800 px-1.5 py-0.5 rounded text-[9px] sm:text-[10px] font-bold whitespace-nowrap">
+                                    Late (+{{ tx.total_fines|floatformat:0 }})
+                                </span>
+                                {% else %}
+                                <span class="bg-emerald-950 text-emerald-400 border border-emerald-800 px-1.5 py-0.5 rounded text-[9px] sm:text-[10px] font-bold whitespace-nowrap">
+                                    ✓ On Time
+                                </span>
+                                {% endif %}
+                            </td>
+                            <td class="px-3 sm:px-4 py-3 text-right font-mono text-gray-400 text-[10px] sm:text-[11px] whitespace-nowrap">
+                                {{ tx.timestamp_received|date:"d M H:i" }}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center py-6 text-gray-500 font-sans text-xs">No M-Pesa receipts logged yet.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- VIEW B: Gameweek Breakdown (Per-GW Allocations) -->
+            <div id="statement-view-allocations" class="overflow-x-auto hidden" style="-webkit-overflow-scrolling: touch;">
                 <table class="w-full text-left text-xs sm:text-sm text-gray-300">
                     <thead class="bg-gray-800/60 uppercase text-gray-400 font-bold border-b border-gray-800 text-[10px] sm:text-xs">
                         <tr>
@@ -156,15 +288,316 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="5" class="text-center py-6 text-gray-500 font-sans text-xs">No payments logged yet.</td>
+                            <td colspan="5" class="text-center py-6 text-gray-500 font-sans text-xs">No allocations logged yet.</td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
+
         </div>
 
     </div>
 
 </div>
 {% endblock %}
+
+{% block extra_js %}
+<script>
+    const chartData = JSON.parse('{{ chart_payload_json|escapejs }}');
+    let performanceChart = null;
+    let currentMode = 'points';
+
+    function renderPerformanceChart(mode) {
+        const ctx = document.getElementById('managerPerformanceChart');
+        if (!ctx) return;
+
+        if (performanceChart) {
+            performanceChart.destroy();
+        }
+
+        let config = {};
+
+        if (mode === 'points') {
+            // Mode 1: Net Points vs League Average & High
+            config = {
+                type: 'bar',
+                data: {
+                    labels: chartData.gw_labels,
+                    datasets: [
+                        {
+                            type: 'bar',
+                            label: `${chartData.manager_name} Net Pts`,
+                            data: chartData.manager_net_points,
+                            backgroundColor: '#00ff87',
+                            hoverBackgroundColor: '#02efff',
+                            borderRadius: 6,
+                            order: 2,
+                        },
+                        {
+                            type: 'line',
+                            label: 'League Average',
+                            data: chartData.league_averages,
+                            borderColor: '#02efff',
+                            backgroundColor: 'rgba(2, 239, 255, 0.1)',
+                            borderDash: [5, 5],
+                            borderWidth: 2,
+                            pointRadius: 4,
+                            pointHoverRadius: 6,
+                            tension: 0.3,
+                            order: 1,
+                        },
+                        {
+                            type: 'line',
+                            label: 'League Highest',
+                            data: chartData.league_maximums,
+                            borderColor: '#f59e0b',
+                            backgroundColor: 'transparent',
+                            borderWidth: 1.5,
+                            pointRadius: 3,
+                            pointHoverRadius: 5,
+                            tension: 0.3,
+                            order: 0,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { color: '#9ca3af', boxWidth: 10, font: { size: 11, weight: 'bold' } }
+                        },
+                        tooltip: {
+                            backgroundColor: '#111827',
+                            titleColor: '#fff',
+                            bodyColor: '#d1d5db',
+                            borderColor: '#374151',
+                            borderWidth: 1,
+                            padding: 10,
+                            callbacks: {
+                                label: function(context) {
+                                    return ` ${context.dataset.label}: ${context.parsed.y} pts`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: '#1f2937' },
+                            ticks: { color: '#9ca3af', font: { size: 11, weight: 'bold' } }
+                        },
+                        y: {
+                            grid: { color: '#1f2937' },
+                            ticks: { color: '#9ca3af', font: { size: 11 } },
+                            title: { display: true, text: 'Points', color: '#6b7280', font: { size: 10 } }
+                        }
+                    }
+                }
+            };
+        } else if (mode === 'rank') {
+            // Mode 2: Mini-League Rank Trajectory (Inverted axis)
+            config = {
+                type: 'line',
+                data: {
+                    labels: chartData.gw_labels,
+                    datasets: [
+                        {
+                            label: 'Gameweek Rank',
+                            data: chartData.manager_ranks,
+                            borderColor: '#00ff87',
+                            backgroundColor: 'rgba(0, 255, 135, 0.1)',
+                            borderWidth: 3,
+                            pointRadius: 6,
+                            pointHoverRadius: 8,
+                            pointBackgroundColor: function(context) {
+                                const val = context.raw;
+                                if (val === 1) return '#fbbf24'; // Gold
+                                if (val === 2) return '#cbd5e1'; // Silver
+                                if (val === 3) return '#b45309'; // Bronze
+                                return '#00ff87';
+                            },
+                            fill: true,
+                            tension: 0.3,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: '#111827',
+                            titleColor: '#fff',
+                            borderColor: '#374151',
+                            borderWidth: 1,
+                            callbacks: {
+                                label: function(context) {
+                                    const rank = context.parsed.y;
+                                    const suffix = rank === 1 ? '1st Place 🥇' : rank === 2 ? '2nd Place 🥈' : rank === 3 ? '3rd Place 🥉' : `Rank ${rank}`;
+                                    return ` Mini-League: ${suffix}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: '#1f2937' },
+                            ticks: { color: '#9ca3af', font: { size: 11, weight: 'bold' } }
+                        },
+                        y: {
+                            reverse: true,
+                            min: 1,
+                            max: 10,
+                            grid: { color: '#1f2937' },
+                            ticks: {
+                                stepSize: 1,
+                                color: '#9ca3af',
+                                font: { size: 11 },
+                                callback: function(val) {
+                                    if (val === 1) return '🥇 1st';
+                                    if (val === 2) return '🥈 2nd';
+                                    if (val === 3) return '🥉 3rd';
+                                    return `#${val}`;
+                                }
+                            },
+                            title: { display: true, text: 'League Rank (Top is better)', color: '#6b7280', font: { size: 10 } }
+                        }
+                    }
+                }
+            };
+        } else if (mode === 'cumulative') {
+            // Mode 3: Cumulative Points Progression
+            config = {
+                type: 'line',
+                data: {
+                    labels: chartData.gw_labels,
+                    datasets: [
+                        {
+                            label: `${chartData.manager_name} Total`,
+                            data: chartData.cumulative_points,
+                            borderColor: '#00ff87',
+                            backgroundColor: 'rgba(0, 255, 135, 0.15)',
+                            borderWidth: 2.5,
+                            pointRadius: 4,
+                            pointHoverRadius: 6,
+                            fill: true,
+                            tension: 0.3,
+                        },
+                        {
+                            label: 'League Cum. Average',
+                            data: chartData.cumulative_averages,
+                            borderColor: '#8b5cf6',
+                            borderDash: [4, 4],
+                            borderWidth: 2,
+                            pointRadius: 3,
+                            tension: 0.3,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { color: '#9ca3af', boxWidth: 10, font: { size: 11, weight: 'bold' } }
+                        },
+                        tooltip: {
+                            backgroundColor: '#111827',
+                            titleColor: '#fff',
+                            borderColor: '#374151',
+                            borderWidth: 1,
+                            callbacks: {
+                                label: function(context) {
+                                    return ` ${context.dataset.label}: ${context.parsed.y} pts`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: '#1f2937' },
+                            ticks: { color: '#9ca3af', font: { size: 11, weight: 'bold' } }
+                        },
+                        y: {
+                            grid: { color: '#1f2937' },
+                            ticks: { color: '#9ca3af', font: { size: 11 } },
+                            title: { display: true, text: 'Cumulative Points', color: '#6b7280', font: { size: 10 } }
+                        }
+                    }
+                }
+            };
+        }
+
+        performanceChart = new Chart(ctx, config);
+    }
+
+    function switchChartMode(mode) {
+        currentMode = mode;
+        const btnPoints = document.getElementById('btn-tab-points');
+        const btnRank = document.getElementById('btn-tab-rank');
+        const btnCum = document.getElementById('btn-tab-cumulative');
+
+        const activeClasses = ['bg-purple-900', 'text-fpl-green', 'shadow-sm', 'border', 'border-purple-700/60'];
+        const inactiveClasses = ['text-gray-400', 'hover:text-white'];
+
+        [btnPoints, btnRank, btnCum].forEach(btn => {
+            btn.classList.remove(...activeClasses);
+            btn.classList.add(...inactiveClasses);
+        });
+
+        if (mode === 'points') {
+            btnPoints.classList.remove(...inactiveClasses);
+            btnPoints.classList.add(...activeClasses);
+        } else if (mode === 'rank') {
+            btnRank.classList.remove(...inactiveClasses);
+            btnRank.classList.add(...activeClasses);
+        } else if (mode === 'cumulative') {
+            btnCum.classList.remove(...inactiveClasses);
+            btnCum.classList.add(...activeClasses);
+        }
+
+        renderPerformanceChart(mode);
+    }
+
+    function toggleStatementView(view) {
+        const viewReceipts = document.getElementById('statement-view-receipts');
+        const viewAllocations = document.getElementById('statement-view-allocations');
+        const btnReceipts = document.getElementById('btn-stmt-receipts');
+        const btnAllocations = document.getElementById('btn-stmt-allocations');
+
+        const activeClasses = ['bg-purple-900', 'text-fpl-green', 'shadow-sm', 'border', 'border-purple-700/60'];
+        const inactiveClasses = ['text-gray-400', 'hover:text-white'];
+
+        if (view === 'receipts') {
+            viewReceipts.classList.remove('hidden');
+            viewAllocations.classList.add('hidden');
+
+            btnReceipts.classList.remove(...inactiveClasses);
+            btnReceipts.classList.add(...activeClasses);
+
+            btnAllocations.classList.remove(...activeClasses);
+            btnAllocations.classList.add(...inactiveClasses);
+        } else {
+            viewReceipts.classList.add('hidden');
+            viewAllocations.classList.remove('hidden');
+
+            btnAllocations.classList.remove(...inactiveClasses);
+            btnAllocations.classList.add(...activeClasses);
+
+            btnReceipts.classList.remove(...activeClasses);
+            btnReceipts.classList.add(...inactiveClasses);
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        renderPerformanceChart('points');
+    });
+</script>
+{% endblock %}
+

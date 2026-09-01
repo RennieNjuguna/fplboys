@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block title %}Confirm Delete Transaction - FPL Boys{% endblock %}
+
+{% block content %}
+<div class="max-w-md mx-auto my-12">
+    <div class="bg-gray-900 border border-rose-900/60 rounded-3xl p-6 sm:p-8 shadow-2xl">
+        <div class="w-12 h-12 rounded-2xl bg-rose-950 text-rose-400 border border-rose-800 flex items-center justify-center text-xl mx-auto mb-4">
+            🗑️
+        </div>
+
+        <h1 class="text-xl font-black text-white text-center">Confirm Transaction Deletion</h1>
+        <p class="text-xs text-gray-400 text-center mt-2">
+            Are you sure you want to permanently delete this M-Pesa transaction and all its gameweek allocations?
+        </p>
+
+        <div class="my-6 p-4 rounded-2xl bg-gray-800/60 border border-gray-700/60 text-xs space-y-2">
+            <div class="flex justify-between">
+                <span class="text-gray-400">Manager:</span>
+                <strong class="text-white">{{ transaction.member.manager_name }}</strong>
+            </div>
+            <div class="flex justify-between">
+                <span class="text-gray-400">Transaction Amount:</span>
+                <strong class="text-emerald-400 font-mono text-sm font-black">Ksh. {{ transaction.amount|floatformat:2 }}</strong>
+            </div>
+            {% if transaction.mpesa_code %}
+            <div class="flex justify-between">
+                <span class="text-gray-400">M-Pesa Ref:</span>
+                <span class="font-mono text-gray-300 font-bold">{{ transaction.mpesa_code }}</span>
+            </div>
+            {% endif %}
+            <div class="flex justify-between">
+                <span class="text-gray-400">Date Received:</span>
+                <span class="text-gray-300">{{ transaction.timestamp_received|date:"d M Y, H:i" }}</span>
+            </div>
+            <div class="pt-2 border-t border-gray-700/60">
+                <span class="text-gray-400 block mb-1 text-[11px] font-bold">Allocations to be removed:</span>
+                <span class="text-purple-300 font-mono text-[11px] block">{{ transaction.allocations_summary_text }}</span>
+            </div>
+        </div>
+
+        <form method="POST" class="flex items-center justify-between space-x-3">
+            {% csrf_token %}
+            <a href="{% url 'treasurer_portal' %}" class="w-1/2 py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs font-bold text-center rounded-xl border border-gray-700 transition-colors">
+                Cancel
+            </a>
+            <button type="submit" class="w-1/2 py-2.5 bg-rose-600 hover:bg-rose-500 text-white text-xs font-black rounded-xl shadow-lg transition-all">
+                Yes, Delete
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}

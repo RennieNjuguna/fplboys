@@ -9,10 +9,10 @@ import pytz
 
 from league.models import Member, Gameweek, GameweekResult
 from league.services.fpl_client import FPLSyncService
-from treasury.models import Payment, AuditLog, TreasuryConfig, PrizePayout
+from treasury.models import Payment, AuditLog, TreasuryConfig, PrizePayout, PaymentTransaction
 
 from treasury.forms import PaymentForm
-from treasury.services.ledger_matrix import build_financial_ledger_matrix
+from treasury.services.ledger_matrix import build_financial_ledger_matrix, get_active_gw_flagged_summary
 
 from treasury.services.pot_calculator import get_treasury_summary, get_member_financial_leaderboard
 from treasury.decorators import treasury_admin_required
@@ -80,17 +80,22 @@ def financial_ledger_view(request):
     Publicly accessible Financial Ledger split into 2 views/tabs:
     1. GW Contributions (Matrix grid of Members x GW payments, fines, with large GW Totals)
     2. Earnings (Leaderboard of Total Paid, Fines, Prizes Won, Net P/L, plus interactive analytics charts)
+    Includes Active Gameweek Flagged & Ticking Bomb Radar.
     """
     active_tab = request.GET.get('tab', 'contributions')  # 'contributions' or 'earnings'
+    selected_gw = request.GET.get('radar_gw')
+    
     matrix_data = build_financial_ledger_matrix(max_gws=38)
     treasury = get_treasury_summary()
     earnings_leaderboard = get_member_financial_leaderboard()
+    flagged_summary = get_active_gw_flagged_summary(target_gw_num=selected_gw)
 
     context = {
         'active_tab': active_tab,
         'matrix': matrix_data,
         'treasury': treasury,
         'earnings_leaderboard': earnings_leaderboard,
+        'flagged_summary': flagged_summary,
     }
     return render(request, 'dashboard/ledger.html', context)
 
@@ -253,7 +258,8 @@ def treasurer_portal_view(request):
     else:
         form = PaymentForm()
 
-    all_payments = Payment.objects.select_related('member', 'gameweek').order_by('-timestamp_received', '-created_at')
+    all_transactions = PaymentTransaction.objects.select_related('member', 'starting_gameweek').prefetch_related('allocations', 'allocations__gameweek').order_by('-timestamp_received', '-created_at')
+    all_payments = Payment.objects.select_related('member', 'gameweek', 'transaction').order_by('-timestamp_received', '-created_at')
     audit_logs = AuditLog.objects.all().order_by('-created_at')[:10]
     treasury = get_treasury_summary()
 
@@ -284,6 +290,7 @@ def treasurer_portal_view(request):
 
     context = {
         'form': form,
+        'all_transactions': all_transactions,
         'all_payments': all_payments,
         'prize_payouts': prize_payouts,
         'audit_logs': audit_logs,
@@ -391,6 +398,32 @@ def payment_delete_view(request, payment_id):
         'payment': payment,
     }
     return render(request, 'treasury/payment_confirm_delete.html', context)
+
+
+@treasury_admin_required
+def transaction_delete_view(request, transaction_id):
+    """
+    Delete a PaymentTransaction and all its associated per-GW allocations.
+    """
+    tx = get_object_or_404(PaymentTransaction, pk=transaction_id)
+    member_name = tx.member.manager_name
+    amount = tx.amount
+    ref = tx.mpesa_code
+
+    if request.method == 'POST':
+        tx.delete()
+        AuditLog.objects.create(
+            action='PAYMENT_DELETED',
+            description=f"Deleted M-Pesa transaction ID #{transaction_id} for {member_name} (Ksh. {amount}, Ref: {ref}) and all its GW allocations.",
+            performed_by='Treasurer'
+        )
+        messages.success(request, f"🗑️ Deleted M-Pesa transaction of Ksh. {amount:,.2f} for {member_name} (Ref: {ref or 'N/A'}).")
+        return redirect('treasurer_portal')
+
+    context = {
+        'transaction': tx,
+    }
+    return render(request, 'treasury/transaction_confirm_delete.html', context)
 
 
 @treasury_admin_required
