@@ -540,26 +540,43 @@ class TreasuryFinancialTests(TestCase):
         """
         from treasury.services.ledger_matrix import get_active_gw_flagged_summary
 
-        # Member 1 pays on time for GW3 (finished)
+        # Member 1 pays for GW1, GW2, GW3 (fully cleared)
+        Payment.objects.create(
+            member=self.m1,
+            gameweek=self.gw1,
+            amount_paid=Decimal('150.00'),
+            timestamp_received=self.deadline - timedelta(hours=2),
+            verified=True,
+            mpesa_code="ONTIME1"
+        )
+        Payment.objects.create(
+            member=self.m1,
+            gameweek=self.gw2,
+            amount_paid=Decimal('150.00'),
+            timestamp_received=self.deadline - timedelta(hours=2),
+            verified=True,
+            mpesa_code="ONTIME2"
+        )
         Payment.objects.create(
             member=self.m1,
             gameweek=self.gw3,
             amount_paid=Decimal('150.00'),
             timestamp_received=self.deadline - timedelta(hours=2),
             verified=True,
-            mpesa_code="ONTIME"
+            mpesa_code="ONTIME3"
         )
-        # Member 2 is unpaid for GW3
+        # Member 2 is unpaid for GW1, GW2, GW3
 
         summary = get_active_gw_flagged_summary(target_gw_num=3)
         self.assertIsNotNone(summary)
         self.assertEqual(summary['gw'].number, 3)
         self.assertEqual(summary['cleared_count'], 1)
-        self.assertEqual(summary['flagged_count'], 1)
-        self.assertEqual(summary['cleared_members'][0]['member'], self.m1)
-        self.assertEqual(summary['actually_flagged'][0]['member'], self.m2)
-        self.assertEqual(summary['actually_flagged'][0]['late_fine'], Decimal('50.00'))
-        self.assertEqual(summary['actually_flagged'][0]['total_due'], Decimal('200.00'))
+        self.assertEqual(summary['defaulters_count'], 1)
+        self.assertEqual(summary['current_gw_cleared'][0]['member'], self.m1)
+        self.assertEqual(summary['flagged_defaulters'][0]['member'], self.m2)
+        # For m2: GW1 waived (fine 0), GW2 waived (fine 0), GW3 standard (fine 50)
+        self.assertEqual(summary['flagged_defaulters'][0]['total_fines'], Decimal('50.00'))
+        self.assertEqual(summary['flagged_defaulters'][0]['total_due'], Decimal('500.00'))
 
     def test_active_gw_flagged_summary_ticking_bomb(self):
         """
@@ -592,9 +609,28 @@ class TreasuryFinancialTests(TestCase):
         self.assertTrue(summary['is_within_24h'])
         self.assertEqual(summary['cleared_count'], 1)
         self.assertEqual(summary['pending_count'], 1)
-        self.assertEqual(summary['to_be_flagged'][0]['member'], self.m2)
-        self.assertEqual(summary['to_be_flagged'][0]['status_type'], 'TICKING_BOMB')
-        self.assertEqual(summary['to_be_flagged'][0]['balance_due'], Decimal('150.00'))
+        self.assertEqual(summary['current_gw_pending'][0]['member'], self.m2)
+        self.assertEqual(summary['current_gw_pending'][0]['balance_due'], Decimal('150.00'))
+
+    def test_fine_waiver_for_gw1_and_gw2(self):
+        """
+        Test that defaults in GW1 or GW2 carry Ksh. 0 late fine.
+        """
+        from treasury.services.ledger_matrix import get_active_gw_flagged_summary
+        
+        # Member 2 is unpaid for GW1 and GW2
+        summary = get_active_gw_flagged_summary(target_gw_num=3)
+        self.assertIsNotNone(summary)
+        
+        # Check m2 in flagged_defaulters
+        m2_default = next((d for d in summary['flagged_defaulters'] if d['member'] == self.m2), None)
+        self.assertIsNotNone(m2_default)
+        
+        # For GW1 and GW2 in m2_default['defaulted_gws'], late_fine should be 0.00
+        for gwd in m2_default['defaulted_gws']:
+            if gwd['gw_number'] in (1, 2, 19, 38):
+                self.assertEqual(gwd['late_fine'], Decimal('0.00'))
+                self.assertTrue(gwd['is_waived'])
 
     def test_lump_sum_400_payment_transaction_creation_and_breakdown(self):
         """
