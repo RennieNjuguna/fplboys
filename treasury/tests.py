@@ -225,7 +225,10 @@ class TreasuryFinancialTests(TestCase):
         self.assertFalse(Payment.objects.filter(id=p.id).exists())
 
     def test_bulk_payment_carryover_across_gameweeks(self):
-        """Paying Ksh. 450 for GW3 automatically funds GW3, GW4, and GW5"""
+        """Paying Ksh. 450 when GW1 & GW2 are paid automatically funds GW3, GW4, and GW5 in FIFO order"""
+        Payment.objects.create(member=self.m1, gameweek=self.gw1, amount_paid=Decimal('150.00'), verified=True)
+        Payment.objects.create(member=self.m1, gameweek=self.gw2, amount_paid=Decimal('150.00'), verified=True)
+
         gw4 = Gameweek.objects.create(number=4, name="Gameweek 4", deadline_time=self.deadline + timedelta(days=7), status='upcoming')
         gw5 = Gameweek.objects.create(number=5, name="Gameweek 5", deadline_time=self.deadline + timedelta(days=14), status='upcoming')
 
@@ -234,7 +237,6 @@ class TreasuryFinancialTests(TestCase):
         resp = self.client.post('/treasury/portal/', {
             'action': 'save_payment',
             'member': self.m1.id,
-            'gameweek': self.gw3.id,
             'amount_paid': '450.00',
             'timestamp_received': timezone.now().strftime('%Y-%m-%dT%H:%M'),
             'mpesa_code': 'BULK450REF',
@@ -298,14 +300,13 @@ class TreasuryFinancialTests(TestCase):
         self.assertEqual(cell_gw3['balance_due'], Decimal('66.67'))
 
     def test_excess_payment_300_disbursement_via_portal(self):
-        """Posting Ksh. 300 in portal disburses Ksh. 150 to current GW and Ksh. 150 to next GW"""
-        gw4 = Gameweek.objects.create(number=4, name="Gameweek 4", deadline_time=self.deadline + timedelta(days=7), status='upcoming')
+        """Posting Ksh. 300 in portal when GW1 is paid disburses Ksh. 150 to GW2 and Ksh. 150 to GW3"""
+        Payment.objects.create(member=self.m2, gameweek=self.gw1, amount_paid=Decimal('150.00'), verified=True)
         self.client.post('/treasury/unlock/', {'password': '@FPLBoyz254??', 'next': '/treasury/portal/'})
 
         resp = self.client.post('/treasury/portal/', {
             'action': 'save_payment',
             'member': self.m2.id,
-            'gameweek': self.gw3.id,
             'amount_paid': '300.00',
             'timestamp_received': timezone.now().strftime('%Y-%m-%dT%H:%M'),
             'mpesa_code': 'PAY300REF',
@@ -313,11 +314,11 @@ class TreasuryFinancialTests(TestCase):
         })
         self.assertEqual(resp.status_code, 302)
 
+        p2 = Payment.objects.get(member=self.m2, gameweek=self.gw2)
         p3 = Payment.objects.get(member=self.m2, gameweek=self.gw3)
-        p4 = Payment.objects.get(member=self.m2, gameweek=gw4)
 
+        self.assertEqual(p2.amount_paid, Decimal('150.00'))
         self.assertEqual(p3.amount_paid, Decimal('150.00'))
-        self.assertEqual(p4.amount_paid, Decimal('150.00'))
 
     def test_record_cash_payout_deduction(self):
         """Recording a cash prize payout (M-Pesa sent) clears the member's available rollover balance"""
@@ -351,33 +352,32 @@ class TreasuryFinancialTests(TestCase):
 
     def test_partial_payment_top_up_after_prize_rollover(self):
         """
-        Manager wins Ksh. 83.33 in GW1 -> rolls over to GW2 (amount_paid=83.33).
-        When treasurer logs remaining Ksh. 66.67, GW2 reaches 150.00 (PAID) and prize balance remains 0.
+        Manager has GW1 paid, wins Ksh. 83.33 in GW1 -> rolls over to GW2 (amount_paid=83.33).
+        Then treasurer logs Ksh. 66.67 via portal (no GW selected).
+        GW2 amount_paid becomes 150.00 (PAID in full).
         """
-        from treasury.services.payment_allocation import get_member_available_prize_balance, apply_winnings_to_future_gameweeks
+        Payment.objects.create(member=self.m1, gameweek=self.gw1, amount_paid=Decimal('150.00'), verified=True)
+        # Give member 1 a prize of 83.33
         GameweekResult.objects.create(
             member=self.m1,
             gameweek=self.gw1,
-            gw_points=80,
+            gw_points=85,
             transfer_cost=0,
             gw_prize_won=Decimal('83.33'),
-            league_rank=3,
+            league_rank=1,
             is_top3=True
         )
-        self.assertEqual(get_member_available_prize_balance(self.m1), Decimal('83.33'))
-
-        # Roll over 83.33 to GW2
+        from treasury.services.payment_allocation import apply_winnings_to_future_gameweeks, get_member_available_prize_balance
         apply_winnings_to_future_gameweeks(self.m1, Decimal('83.33'), start_gw_number=2)
         p_gw2 = Payment.objects.get(member=self.m1, gameweek=self.gw2)
         self.assertEqual(p_gw2.amount_paid, Decimal('83.33'))
         self.assertEqual(get_member_available_prize_balance(self.m1), Decimal('0.00'))
 
-        # Now member pays the remaining balance of Ksh. 66.67 via portal
+        # Now member pays the remaining balance of Ksh. 66.67 via portal (FIFO auto-targets GW2)
         self.client.post('/treasury/unlock/', {'password': '@FPLBoyz254??', 'next': '/treasury/portal/'})
         resp = self.client.post('/treasury/portal/', {
             'action': 'save_payment',
             'member': self.m1.id,
-            'gameweek': self.gw2.id,
             'amount_paid': '66.67',
             'timestamp_received': timezone.now().strftime('%Y-%m-%dT%H:%M'),
             'mpesa_code': 'CASH66REF',
@@ -403,9 +403,10 @@ class TreasuryFinancialTests(TestCase):
 
     def test_partial_payment_with_excess_rollover(self):
         """
-        Manager has partial contribution of Ksh. 100 in GW2.
-        When member pays standard Ksh. 150.00, GW2 receives Ksh. 50 (reaching 150) and GW3 receives Ksh. 100.
+        Manager has GW1 paid, and partial contribution of Ksh. 100 in GW2.
+        When member pays standard Ksh. 150.00, GW2 receives Ksh. 50 (reaching 150) and GW3 receives Ksh. 100 in FIFO order.
         """
+        Payment.objects.create(member=self.m2, gameweek=self.gw1, amount_paid=Decimal('150.00'), verified=True)
         Payment.objects.create(
             member=self.m2,
             gameweek=self.gw2,
@@ -419,7 +420,6 @@ class TreasuryFinancialTests(TestCase):
         resp = self.client.post('/treasury/portal/', {
             'action': 'save_payment',
             'member': self.m2.id,
-            'gameweek': self.gw2.id,
             'amount_paid': '150.00',
             'timestamp_received': timezone.now().strftime('%Y-%m-%dT%H:%M'),
             'mpesa_code': 'EXCESS150REF',
@@ -443,7 +443,6 @@ class TreasuryFinancialTests(TestCase):
         resp = self.client.post('/treasury/portal/', {
             'action': 'save_payment',
             'member': self.m1.id,
-            'gameweek': self.gw1.id,
             'amount_paid': '500.00',
             'timestamp_received': timezone.now().strftime('%Y-%m-%dT%H:%M'),
             'mpesa_code': 'BULK500REF',
@@ -667,6 +666,88 @@ class TreasuryFinancialTests(TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "Ksh. 400")
         self.assertContains(resp, "QJH78291KL")
+
+    def test_auto_fifo_payment_allocation_without_start_gw(self):
+        """
+        Test that allocating payment without start_gw automatically finds the earliest
+        unpaid GW (e.g. GW2 if GW1 is paid) and distributes sequentially in FIFO order.
+        """
+        from treasury.models import PaymentTransaction
+        from treasury.services.payment_allocation import allocate_payment_with_rollover
+
+        # Pay GW1 in advance
+        Payment.objects.create(
+            member=self.m1,
+            gameweek=self.gw1,
+            amount_paid=Decimal('150.00'),
+            verified=True,
+            mpesa_code="GW1PAID"
+        )
+
+        # Log Ksh. 250 without specifying start_gw
+        created = allocate_payment_with_rollover(
+            member=self.m1,
+            start_gw=None,
+            total_amount=Decimal('250.00'),
+            timestamp=timezone.now(),
+            mpesa_code="FIFO250",
+            verified=True
+        )
+
+        self.assertEqual(len(created), 2)
+        # GW2 gets 150 (paid in full)
+        p_gw2 = Payment.objects.get(member=self.m1, gameweek=self.gw2)
+        self.assertEqual(p_gw2.amount_paid, Decimal('150.00'))
+        # GW3 gets 100 (partial balance)
+        p_gw3 = Payment.objects.get(member=self.m1, gameweek=self.gw3)
+        self.assertEqual(p_gw3.amount_paid, Decimal('100.00'))
+
+        # Transaction starting gameweek should be GW2
+        tx = PaymentTransaction.objects.get(mpesa_code="FIFO250")
+        self.assertEqual(tx.starting_gameweek, self.gw2)
+
+    def test_auto_fifo_interplay_with_prize_rollover(self):
+        """
+        Test that prize winnings rollover and cash payments work together in FIFO order.
+        If a prize rollover pays GW1 (150) and partially pays GW2 (100),
+        a new M-Pesa payment of 150 automatically completes GW2 (with 50) and rolls 100 into GW3.
+        """
+        from treasury.services.payment_allocation import allocate_payment_with_rollover
+
+        # 1. Prize rollover: Ksh. 250 across GW1 (150) and GW2 (100)
+        allocate_payment_with_rollover(
+            member=self.m2,
+            start_gw=None,
+            total_amount=Decimal('250.00'),
+            timestamp=timezone.now(),
+            verified=True,
+            is_prize=True
+        )
+
+        p1 = Payment.objects.get(member=self.m2, gameweek=self.gw1)
+        self.assertEqual(p1.amount_paid, Decimal('150.00'))
+        p2 = Payment.objects.get(member=self.m2, gameweek=self.gw2)
+        self.assertEqual(p2.amount_paid, Decimal('100.00'))
+
+        # 2. Cash M-Pesa payment: Ksh. 150 with start_gw=None
+        allocate_payment_with_rollover(
+            member=self.m2,
+            start_gw=None,
+            total_amount=Decimal('150.00'),
+            timestamp=timezone.now(),
+            mpesa_code="TOPUP150",
+            verified=True,
+            is_prize=False
+        )
+
+        p2.refresh_from_db()
+        self.assertEqual(p2.amount_paid, Decimal('150.00')) # GW2 is now fully paid at 150
+        self.assertIn("PRIZE", p2.mpesa_code)
+        self.assertIn("TOPUP150", p2.mpesa_code)
+
+        p3 = Payment.objects.get(member=self.m2, gameweek=self.gw3)
+        self.assertEqual(p3.amount_paid, Decimal('100.00')) # GW3 received the remaining 100
+        self.assertIn("TOPUP150", p3.mpesa_code)
 
 
 

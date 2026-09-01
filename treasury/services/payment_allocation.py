@@ -101,7 +101,7 @@ def allocate_payment_with_rollover(
     query = Gameweek.objects.filter(number__gte=min_gw).order_by('number')
 
     candidate_gws = list(query)
-    start_gw_target = start_gw or (candidate_gws[0] if candidate_gws else None)
+    start_gw_target = start_gw
 
     with transaction.atomic():
         if transaction_obj is None:
@@ -117,6 +117,7 @@ def allocate_payment_with_rollover(
                 verified=verified
             )
 
+        first_allocated_gw = None
         for gw in candidate_gws:
             if remaining_balance <= Decimal('0.00'):
                 break
@@ -131,6 +132,14 @@ def allocate_payment_with_rollover(
             allocating = min(remaining_balance, needed)
             if allocating <= Decimal('0.00'):
                 continue
+
+            if first_allocated_gw is None:
+                first_allocated_gw = gw
+                if transaction_obj and (transaction_obj.starting_gameweek is None or start_gw is None):
+                    transaction_obj.starting_gameweek = gw
+                    transaction_obj.save(update_fields=['starting_gameweek'])
+
+            is_first = (gw == first_allocated_gw)
 
             if existing_payment:
                 existing_payment.amount_paid += allocating
@@ -164,14 +173,13 @@ def allocate_payment_with_rollover(
                 existing_payment.save()
                 created_payments.append(existing_payment)
             else:
-                is_first = (start_gw is not None and gw.number == start_gw.number)
                 if is_prize:
                     ref_code = "PRIZE-WINNINGS"
                     custom_notes = notes or f"Funded via tournament prize winnings"
                 else:
                     ref_suffix = " (Carryover)" if not is_first and mpesa_code else ""
                     ref_code = f"{mpesa_code}{ref_suffix}" if mpesa_code else None
-                    custom_notes = notes or (f"Lump sum payment for GW {start_gw.number}" if (start_gw and is_first) else f"Auto carryover payment")
+                    custom_notes = notes or (f"Payment for GW {gw.number}" if is_first else f"Auto carryover payment for GW {gw.number}")
 
                 new_payment = Payment.objects.create(
                     transaction=transaction_obj,
@@ -198,14 +206,12 @@ def allocate_payment_with_rollover(
             remaining_balance -= allocating
 
         source_desc = "prize winnings" if is_prize else f"payment of Ksh. {total_amount}"
-        start_gw_num = start_gw.number if start_gw else (candidate_gws[0].number if candidate_gws else 1)
+        start_gw_num = first_allocated_gw.number if first_allocated_gw else (candidate_gws[0].number if candidate_gws else 1)
         AuditLog.objects.create(
             action='PAYMENT_CREATED',
             description=f"Processed {source_desc} for {member.manager_name} (Tx #{transaction_obj.id}). Allocated Ksh. {total_amount_dec - remaining_balance:,.2f} across {len(created_payments)} gameweeks starting GW {start_gw_num}.",
             performed_by='Treasurer'
         )
-
-    return created_payments
 
     return created_payments
 

@@ -11,7 +11,7 @@ from league.models import Member, Gameweek, GameweekResult
 from league.services.fpl_client import FPLSyncService
 from treasury.models import Payment, AuditLog, TreasuryConfig, PrizePayout, PaymentTransaction
 
-from treasury.forms import PaymentForm
+from treasury.forms import PaymentForm, LogMpesaPaymentForm
 from treasury.services.ledger_matrix import build_financial_ledger_matrix, get_active_gw_flagged_summary
 
 from treasury.services.pot_calculator import get_treasury_summary, get_member_financial_leaderboard
@@ -214,20 +214,19 @@ def treasurer_portal_view(request):
 
 
         elif action == 'save_payment':
-            form = PaymentForm(request.POST)
+            form = LogMpesaPaymentForm(request.POST)
             if form.is_valid():
                 amount_paid = form.cleaned_data['amount_paid']
                 member = form.cleaned_data['member']
-                gameweek = form.cleaned_data['gameweek']
                 timestamp_received = form.cleaned_data['timestamp_received']
                 mpesa_code = form.cleaned_data['mpesa_code']
                 notes = form.cleaned_data['notes']
                 verified = form.cleaned_data.get('verified', True)
 
-                # Process payment using unified allocation engine with automatic rollover
+                # Process payment using unified FIFO allocation engine starting from earliest unpaid/partial GW
                 created_payments = allocate_payment_with_rollover(
                     member=member,
-                    start_gw=gameweek,
+                    start_gw=None,
                     total_amount=amount_paid,
                     timestamp=timestamp_received,
                     mpesa_code=mpesa_code,
@@ -237,9 +236,11 @@ def treasurer_portal_view(request):
                 )
 
                 if len(created_payments) > 1:
+                    first_gw_num = created_payments[0].gameweek.number
+                    last_gw_num = created_payments[-1].gameweek.number
                     messages.success(
                         request,
-                        f"✅ Payment of Ksh. {amount_paid:,.2f} recorded for {member.manager_name}! Distributed across {len(created_payments)} gameweeks starting GW {gameweek.number}."
+                        f"✅ Payment of Ksh. {amount_paid:,.2f} recorded for {member.manager_name}! Auto-allocated across {len(created_payments)} gameweeks (GW {first_gw_num} to GW {last_gw_num}) in sequential FIFO order."
                     )
                 elif created_payments:
                     payment = created_payments[0]
@@ -256,7 +257,7 @@ def treasurer_portal_view(request):
                 messages.error(request, "Please correct the errors in the payment form.")
 
     else:
-        form = PaymentForm()
+        form = LogMpesaPaymentForm()
 
     all_transactions = PaymentTransaction.objects.select_related('member', 'starting_gameweek').prefetch_related('allocations', 'allocations__gameweek').order_by('-timestamp_received', '-created_at')
     all_payments = Payment.objects.select_related('member', 'gameweek', 'transaction').order_by('-timestamp_received', '-created_at')
@@ -429,26 +430,19 @@ def transaction_delete_view(request, transaction_id):
 @treasury_admin_required
 def api_check_deadline(request):
     """
-    AJAX endpoint to check if a chosen timestamp is after the GW deadline,
-    and returns any existing partial payment or balance due for the selected member.
+    AJAX endpoint to check payment status and provide smart FIFO previews.
+    If gw_id is not provided, automatically resolves to the member's earliest
+    unpaid or partially-paid gameweek in sequential FIFO order.
     """
     gw_id = request.GET.get('gw_id')
     member_id = request.GET.get('member_id')
     timestamp_str = request.GET.get('timestamp')
 
-    if not gw_id:
-        return JsonResponse({'error': 'Missing gw_id'}, status=400)
-
-    try:
-        gw = Gameweek.objects.get(pk=gw_id)
-    except Gameweek.DoesNotExist:
-        return JsonResponse({'error': 'Gameweek not found'}, status=404)
-
     member = None
     if member_id:
         try:
             member = Member.objects.get(pk=member_id)
-        except Member.DoesNotExist:
+        except (Member.DoesNotExist, ValueError):
             member = None
 
     if timestamp_str:
@@ -462,13 +456,40 @@ def api_check_deadline(request):
     else:
         ts = timezone.now()
 
+    standard_due = Decimal('150.00')
+
+    # Resolve target gameweek
+    gw = None
+    if gw_id:
+        try:
+            gw = Gameweek.objects.get(pk=gw_id)
+        except (Gameweek.DoesNotExist, ValueError):
+            gw = None
+
+    if not gw and member:
+        # Auto-detect earliest unpaid / partial gameweek for member
+        joined_gw = getattr(member, 'joined_gameweek', 1)
+        for g in Gameweek.objects.filter(number__gte=joined_gw).order_by('number'):
+            p = Payment.objects.filter(member=member, gameweek=g, verified=True).first()
+            paid = p.amount_paid if p else Decimal('0.00')
+            if paid < standard_due:
+                gw = g
+                break
+        if not gw:
+            gw = Gameweek.objects.filter(number__gte=joined_gw).order_by('-number').first()
+
+    if not gw:
+        gw = Gameweek.objects.filter(status__in=['active', 'upcoming']).order_by('number').first() or Gameweek.objects.first()
+
+    if not gw:
+        return JsonResponse({'error': 'No gameweek available'}, status=400)
+
     is_waived = gw.number in (1, 2, 19, 38)
     is_late = False
     if gw.deadline_time and ts and not is_waived:
         is_late = ts > gw.deadline_time
 
     late_fine = Decimal('50.00') if is_late else Decimal('0.00')
-    standard_due = Decimal('150.00')
 
     existing_paid = Decimal('0.00')
     has_existing = False
@@ -483,8 +504,6 @@ def api_check_deadline(request):
     # Recommended amount
     if has_existing and balance_due > Decimal('0.00'):
         recommended_amount = balance_due
-    elif has_existing and balance_due <= Decimal('0.00'):
-        recommended_amount = standard_due
     elif is_late:
         recommended_amount = Decimal('200.00')
     else:
@@ -493,22 +512,23 @@ def api_check_deadline(request):
     eat_tz = pytz.timezone('Africa/Nairobi')
     dl_local = gw.deadline_time.astimezone(eat_tz).strftime('%b %d, %Y at %I:%M %p EAT') if gw.deadline_time else 'N/A'
 
-    if has_existing and existing_paid < standard_due:
-        msg = f"ℹ️ {member.manager_name} has existing payment of Ksh. {existing_paid:,.2f} for {gw.name}. Balance remaining: Ksh. {balance_due:,.2f}."
-    elif has_existing and existing_paid >= standard_due:
-        msg = f"✓ {member.manager_name} is already fully paid for {gw.name} (Ksh. {existing_paid:,.2f}). Any new payment will automatically rollover to next GW."
+    if member and has_existing and existing_paid < standard_due:
+        msg = f"ℹ️ {member.manager_name} has existing partial payment of Ksh. {existing_paid:,.2f} on {gw.name}. New payment will complete {gw.name} (Bal: Ksh. {balance_due:,.2f}) and cascade any excess to next GWs via FIFO."
+    elif member and not has_existing:
+        joined_note = f" (joined GW {member.joined_gameweek})" if getattr(member, 'joined_gameweek', 1) > 1 and gw.number == member.joined_gameweek else ""
+        msg = f"ℹ️ Auto FIFO: Payment for {member.manager_name} will start sequentially at {gw.name}{joined_note} and cascade in Ksh. 150 increments across future unpaid GWs."
     elif is_waived:
         waiver_reason = {
-            1: "Start of the season waiver",
-            2: "Teams not yet set up waiver",
-            19: "Middle of the season waiver",
-            38: "End of the season waiver",
+            1: "Season Kickoff Waiver",
+            2: "Early Season Setup Waiver",
+            19: "Mid-Season Holiday Waiver",
+            38: "Season Finale Waiver",
         }.get(gw.number, "Waiver Gameweek")
-        msg = f"🎁 {gw.name} Fine Waiver ({waiver_reason}): No late fine applies (Standard: Ksh. 150)."
+        msg = f"🎁 {gw.name} Fine Waiver ({waiver_reason}): No late fine applies."
     elif is_late:
         msg = f"⚠️ Payment timestamp is after {gw.name} deadline ({dl_local}). Ksh. 50 Late Fine applied (Total: Ksh. 200)."
     else:
-        msg = f"✅ On-time payment for {gw.name} (Deadline: {dl_local})."
+        msg = f"✅ On-time FIFO payment starting at {gw.name} (Deadline: {dl_local})."
 
     return JsonResponse({
         'is_late': is_late,
@@ -517,6 +537,7 @@ def api_check_deadline(request):
         'existing_paid': float(existing_paid),
         'balance_due': float(balance_due),
         'gw_name': gw.name,
+        'gw_number': gw.number,
         'deadline_str': dl_local,
         'late_fine': float(late_fine),
         'recommended_amount': float(recommended_amount),

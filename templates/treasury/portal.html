@@ -61,12 +61,9 @@
                 <div>
                     <label class="block text-[11px] font-bold text-gray-300 uppercase tracking-wider mb-1">Member / Manager</label>
                     {{ form.member }}
-                </div>
-
-                <!-- Gameweek Field -->
-                <div>
-                    <label class="block text-[11px] font-bold text-gray-300 uppercase tracking-wider mb-1">Gameweek</label>
-                    {{ form.gameweek }}
+                    <span class="text-[10px] text-fpl-cyan/90 mt-1 block flex items-center">
+                        <i data-lucide="sparkles" class="w-3 h-3 mr-1 inline"></i> Auto FIFO: Sequential allocation across earliest unpaid GWs
+                    </span>
                 </div>
 
                 <!-- Timestamp Received -->
@@ -77,12 +74,11 @@
                     {{ form.timestamp_received }}
                 </div>
 
-
-                <!-- Dynamic Deadline Status Warning Box -->
+                <!-- Dynamic Deadline & FIFO Status Box -->
                 <div id="deadline-status-box" class="p-2.5 rounded-xl border text-xs font-medium bg-gray-800/60 border-gray-700 text-gray-300 transition-all">
                     <div class="flex items-center space-x-2">
                         <i data-lucide="info" class="w-3.5 h-3.5 text-purple-400 flex-shrink-0"></i>
-                        <span id="deadline-status-text" class="text-[11px]">Select Gameweek to verify deadline...</span>
+                        <span id="deadline-status-text" class="text-[11px]">Select Member to preview FIFO allocation path...</span>
                     </div>
                 </div>
 
@@ -90,7 +86,7 @@
                 <div>
                     <label class="block text-[11px] font-bold text-gray-300 uppercase tracking-wider mb-1">Amount Paid (Ksh.)</label>
                     {{ form.amount_paid }}
-                    <span class="text-[10px] text-gray-400 mt-0.5 block">Standard: Ksh. 150 | Late: Ksh. 200 (+50 BBQ fine)</span>
+                    <span class="text-[10px] text-gray-400 mt-0.5 block">Standard: Ksh. 150/GW | Lump sums (e.g. 400, 600, 1500) auto-cascade</span>
                 </div>
 
                 <!-- M-Pesa Reference Code -->
@@ -112,7 +108,7 @@
                 </div>
 
                 <button type="submit" class="w-full mt-2 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-lg transition-all flex items-center justify-center">
-                    <i data-lucide="check" class="w-4 h-4 mr-1.5"></i> Save Payment / Bulk Pay
+                    <i data-lucide="check" class="w-4 h-4 mr-1.5"></i> Save Payment (Auto FIFO)
                 </button>
             </form>
 
@@ -492,26 +488,28 @@
 {% block extra_js %}
 <script>
     const memberSelect = document.getElementById('id_member');
-    const gwSelect = document.getElementById('id_gameweek');
     const timeInput = document.getElementById('id_timestamp_received');
     const amountInput = document.getElementById('id_amount_paid');
     const statusBox = document.getElementById('deadline-status-box');
     const statusText = document.getElementById('deadline-status-text');
 
     async function checkDeadline() {
-        if (!gwSelect || !gwSelect.value) return;
-        const gwId = gwSelect.value;
-        const memberId = memberSelect ? memberSelect.value : '';
+        if (!memberSelect || !memberSelect.value) {
+            if (statusText) statusText.innerText = "Select Member to preview FIFO allocation path...";
+            if (statusBox) statusBox.className = 'p-2.5 rounded-xl border text-xs font-medium bg-gray-800/60 border-gray-700 text-gray-300 transition-all';
+            return;
+        }
+        const memberId = memberSelect.value;
         const timeVal = timeInput ? timeInput.value : '';
 
         try {
-            const resp = await fetch(`{% url "api_check_deadline" %}?gw_id=${gwId}&member_id=${memberId}&timestamp=${encodeURIComponent(timeVal)}`);
+            const resp = await fetch(`{% url "api_check_deadline" %}?member_id=${memberId}&timestamp=${encodeURIComponent(timeVal)}`);
             const data = await resp.json();
 
             statusText.innerText = data.message;
             if (data.has_existing && data.balance_due > 0) {
                 statusBox.className = 'p-2.5 rounded-xl border text-xs font-medium bg-amber-950/70 border-amber-600 text-amber-200 transition-all';
-                if (amountInput) {
+                if (amountInput && (!amountInput.value || amountInput.value === '150.00' || amountInput.value === '150')) {
                     amountInput.value = data.recommended_amount.toFixed(2);
                 }
             } else if (data.is_late) {
@@ -526,7 +524,7 @@
                 }
             }
         } catch (e) {
-            console.error('Error checking deadline:', e);
+            console.error('Error checking FIFO preview:', e);
         }
     }
 
@@ -608,7 +606,6 @@
     }
 
     if (memberSelect) memberSelect.addEventListener('change', checkDeadline);
-    if (gwSelect) gwSelect.addEventListener('change', checkDeadline);
     if (timeInput) timeInput.addEventListener('change', checkDeadline);
     document.addEventListener('DOMContentLoaded', function() {
         checkDeadline();
