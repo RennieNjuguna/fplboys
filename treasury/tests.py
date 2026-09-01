@@ -350,6 +350,44 @@ class TreasuryFinancialTests(TestCase):
         # Available balance is now 0
         self.assertEqual(get_member_available_prize_balance(self.m1), Decimal('0.00'))
 
+    def test_delete_cash_prize_payout_restores_balance(self):
+        """
+        Deleting a cash prize disbursement deletes the PrizePayout record
+        and immediately restores the money back to the winner's available balance.
+        """
+        from treasury.models import PrizePayout
+        from treasury.services.payment_allocation import get_member_available_prize_balance, record_cash_payout
+
+        # Member 1 wins 250 in GW 1
+        GameweekResult.objects.create(
+            member=self.m1,
+            gameweek=self.gw1,
+            gw_points=90,
+            transfer_cost=0,
+            gw_prize_won=Decimal('250.00'),
+            league_rank=1,
+            is_top3=True
+        )
+        self.assertEqual(get_member_available_prize_balance(self.m1), Decimal('250.00'))
+
+        # Disburse Ksh. 150
+        payout = record_cash_payout(
+            member=self.m1,
+            amount=Decimal('150.00'),
+            mpesa_reference='DISBURSE150',
+            notes='Test payout'
+        )
+        self.assertEqual(get_member_available_prize_balance(self.m1), Decimal('100.00'))
+
+        # Now delete the payout via delete view
+        self.client.post('/treasury/unlock/', {'password': '@FPLBoyz254??', 'next': '/treasury/portal/'})
+        resp = self.client.post(f'/treasury/payout/{payout.id}/delete/')
+        self.assertEqual(resp.status_code, 302)
+
+        # PrizePayout is deleted and available balance is restored to 250.00
+        self.assertFalse(PrizePayout.objects.filter(id=payout.id).exists())
+        self.assertEqual(get_member_available_prize_balance(self.m1), Decimal('250.00'))
+
     def test_partial_payment_top_up_after_prize_rollover(self):
         """
         Manager has GW1 paid, wins Ksh. 83.33 in GW1 -> rolls over to GW2 (amount_paid=83.33).

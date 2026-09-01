@@ -266,7 +266,7 @@ def treasurer_portal_view(request):
 
     # Members with their available prize balances
     from treasury.services.payment_allocation import get_member_available_prize_balance, models_sum
-    prize_payouts = PrizePayout.objects.select_related('member', 'gameweek').order_by('-disbursed_at')[:20]
+    prize_payouts = PrizePayout.objects.filter(payout_method='MPESA_CASH').select_related('member', 'gameweek').order_by('-disbursed_at')[:20]
 
     members_winnings_list = []
     for m in members:
@@ -425,6 +425,33 @@ def transaction_delete_view(request, transaction_id):
         'transaction': tx,
     }
     return render(request, 'treasury/transaction_confirm_delete.html', context)
+
+
+@treasury_admin_required
+def payout_delete_view(request, payout_id):
+    """
+    Deletes a recorded cash prize disbursement (M-Pesa payout)
+    and restores that money back to the winner's available prize balance.
+    """
+    payout = get_object_or_404(PrizePayout, pk=payout_id)
+    winner_name = payout.member.manager_name
+    amount = payout.amount
+    ref = payout.mpesa_reference
+
+    if request.method == 'POST':
+        payout.delete()
+        AuditLog.objects.create(
+            action='PRIZE_PAYOUT_DELETED',
+            description=f"Deleted cash prize disbursement of Ksh. {amount:,.2f} for {winner_name} (Ref: {ref or 'N/A'}). Returned Ksh. {amount:,.2f} to winner's available balance.",
+            performed_by='Treasurer'
+        )
+        messages.success(request, f"🗑️ Deleted cash prize disbursement of Ksh. {amount:,.2f} for {winner_name}. Ksh. {amount:,.2f} returned to available prize balance.")
+        return redirect('treasurer_portal')
+
+    context = {
+        'payout': payout,
+    }
+    return render(request, 'treasury/payout_confirm_delete.html', context)
 
 
 @treasury_admin_required
