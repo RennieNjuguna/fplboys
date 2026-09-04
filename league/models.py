@@ -110,10 +110,38 @@ class Gameweek(models.Model):
         return self.deadline_time.astimezone(eat_tz)
 
     @property
+    def start_time(self):
+        """
+        Official Gameweek Start / Kickoff time (when the first match of that GW starts).
+        In Premier League / FPL, kickoff is standard 90 minutes after the transfer deadline closes.
+        """
+        if not self.deadline_time:
+            return None
+        return self.deadline_time + timezone.timedelta(minutes=90)
+
+    @property
+    def start_time_eat(self):
+        """Gameweek start / kickoff in East Africa Time (UTC+3)"""
+        st = self.start_time
+        if not st:
+            return None
+        eat_tz = pytz.timezone('Africa/Nairobi')
+        return st.astimezone(eat_tz)
+
+    @property
     def is_past_deadline(self):
+        """True if FPL transfers have closed (90m before kickoff)"""
         if not self.deadline_time:
             return False
         return timezone.now() > self.deadline_time
+
+    @property
+    def is_past_start(self):
+        """True if the first match of the Gameweek has started / kicked off"""
+        st = self.start_time
+        if not st:
+            return False
+        return timezone.now() >= st
 
 
 class GameweekResult(models.Model):

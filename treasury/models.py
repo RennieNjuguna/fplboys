@@ -161,11 +161,14 @@ class Payment(models.Model):
         return f"{self.member.manager_name} - GW {self.gameweek.number} - Ksh. {self.amount_paid}{late_tag}"
 
     def check_is_late(self):
-        """Check if received strictly after gameweek deadline (except waived GWs)"""
+        """
+        Check if payment was received strictly after the gameweek starts (when the first match kicks off).
+        Waiver gameweeks (GW1, GW2, GW19, GW38) never incur late fines.
+        """
         if self.gameweek and self.gameweek.number in WAIVED_FINE_GAMEWEEKS:
             return False
-        if self.gameweek and self.gameweek.deadline_time and self.timestamp_received:
-            return self.timestamp_received > self.gameweek.deadline_time
+        if self.gameweek and self.gameweek.start_time and self.timestamp_received:
+            return self.timestamp_received > self.gameweek.start_time
         return False
 
     def save(self, *args, **kwargs):

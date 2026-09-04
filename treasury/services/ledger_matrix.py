@@ -104,27 +104,25 @@ def build_financial_ledger_matrix(max_gws=38):
                 'mpesa_code': payment.mpesa_code if payment else None,
                 'timestamp': payment.timestamp_received if payment else None,
                 'is_due': is_due,
+                'is_waived': gw.number in WAIVED_FINE_GAMEWEEKS,
             }
             row_cells.append(cell)
 
-
-        net_pl = row_total_prizes - row_total_paid
+        net_pl = row_total_prizes - row_total_paid - row_total_fines
 
         rows.append({
             'member': member,
             'cells': row_cells,
             'total_paid': row_total_paid,
             'total_fines': row_total_fines,
+            'total_due': row_total_due if 'row_total_due' in locals() else (Decimal('150.00') * row_unpaid_count),
             'total_prizes': row_total_prizes,
             'net_pl': net_pl,
             'unpaid_count': row_unpaid_count,
             'late_count': row_late_count,
         })
 
-    # Prepare ordered columns summary list
     column_summaries = [col_totals[gw.id] for gw in gameweeks]
-
-    # Grand totals
     grand_total_collected = sum(c['total_collected'] for c in column_summaries)
     grand_total_fines = sum(c['total_fines'] for c in column_summaries)
     grand_total_prizes = sum(c['total_prizes'] for c in column_summaries)
@@ -140,27 +138,23 @@ def build_financial_ledger_matrix(max_gws=38):
     }
 
 
-def get_active_gw_flagged_summary(target_gw_num=None):
+def get_active_gw_flagged_summary(target_gw_num=None, target_gw_number=None) -> dict:
     """
-    Computes a season-aware financial status radar:
-    1. Flagged Defaulters: Members who owe contributions/fines for ANY past/finished gameweeks
-       whose deadlines have passed (with zero fines on waived GWs: 1, 2, 19, 38).
-    2. Pending Contributions: Members with unpaid dues for the current active/upcoming gameweek (e.g. GW 3),
-       with ticking-bomb (<24h) countdown warnings.
-    3. Cleared & Paid: Members who have cleared their contributions for the current gameweek.
+    Computes real-time data for the Active Gameweek Radar on the Financial Ledger:
+    1. Flagged Defaulters: Members who owe money for any GW that has officially STARTED (first match kicked off).
+    2. Pending Contributions: Members who haven't yet paid for the current target GW (countdown until first match kickoff).
+    3. Cleared & Paid: Members whose current target GW is 100% cleared.
     """
+    now = timezone.now()
     all_gws = list(Gameweek.objects.all().order_by('number'))
     if not all_gws:
-        return None
+        return {}
 
-    now = timezone.now()
-    standard_fee = Decimal('150.00')
-
-    # Determine current target gameweek (Active or Next Upcoming)
     target_gw = None
-    if target_gw_num:
+    target_num = target_gw_number if target_gw_number is not None else target_gw_num
+    if target_num is not None:
         try:
-            target_gw = Gameweek.objects.get(number=int(target_gw_num))
+            target_gw = Gameweek.objects.get(number=int(target_num))
         except (Gameweek.DoesNotExist, ValueError):
             target_gw = None
 
@@ -173,15 +167,15 @@ def get_active_gw_flagged_summary(target_gw_num=None):
     if not target_gw:
         target_gw = all_gws[0]
 
-    # Deadline status for target GW
-    deadline = target_gw.deadline_time
-    is_past_deadline = target_gw.is_past_deadline or target_gw.status in ['active', 'finished']
+    # Start / Kickoff status for target GW (when first match starts)
+    gw_start = target_gw.start_time
+    is_past_start = target_gw.is_past_start or target_gw.status in ['active', 'finished']
     time_left_seconds = 0
     is_within_24h = False
     time_left_human = ""
 
-    if deadline and not is_past_deadline:
-        diff = (deadline - now).total_seconds()
+    if gw_start and not is_past_start:
+        diff = (gw_start - now).total_seconds()
         if diff > 0:
             time_left_seconds = int(diff)
             is_within_24h = (time_left_seconds <= 86400)
@@ -196,10 +190,10 @@ def get_active_gw_flagged_summary(target_gw_num=None):
             else:
                 time_left_human = f"{minutes}m remaining"
         else:
-            is_past_deadline = True
-            time_left_human = "Deadline Passed"
+            is_past_start = True
+            time_left_human = "Gameweek Started"
     else:
-        time_left_human = "Deadline Passed" if is_past_deadline else "TBD"
+        time_left_human = "Gameweek Started" if is_past_start else "TBD"
 
     # Fine Waiver for current target GW
     is_waived = target_gw.number in WAIVED_FINE_GAMEWEEKS
@@ -212,7 +206,7 @@ def get_active_gw_flagged_summary(target_gw_num=None):
 
     if target_gw.status == 'active':
         gw_state = 'active'
-    elif is_past_deadline:
+    elif is_past_start:
         gw_state = 'active' if target_gw.status != 'finished' else 'finished'
     elif is_within_24h:
         gw_state = 'ticking_bomb'
@@ -222,14 +216,15 @@ def get_active_gw_flagged_summary(target_gw_num=None):
     members = list(Member.objects.filter(is_active=True).order_by('manager_name'))
 
     # =========================================================================
-    # 1. FLAGGED DEFAULTERS (Across all past/finished/active GWs past deadline)
+    # 1. FLAGGED DEFAULTERS (Across all past/finished/active GWs where first match has started)
     # =========================================================================
-    past_gws = list(Gameweek.objects.filter(
-        deadline_time__lt=now
-    ).exclude(number=target_gw.number).order_by('number'))
+    past_gws = [
+        gw for gw in all_gws
+        if (gw.is_past_start or gw.status in ['active', 'finished']) and gw.number != target_gw.number
+    ]
 
-    # If target_gw is itself past deadline, include it in past evaluation
-    if is_past_deadline and target_gw not in past_gws:
+    # If target_gw has itself started, include it in defaulters evaluation
+    if is_past_start and target_gw not in past_gws:
         past_gws.append(target_gw)
         past_gws.sort(key=lambda g: g.number)
 
@@ -249,6 +244,7 @@ def get_active_gw_flagged_summary(target_gw_num=None):
             payment = Payment.objects.filter(member=member, gameweek=gw, verified=True).first()
             paid = payment.amount_paid if payment else Decimal('0.00')
             gw_waived = gw.number in WAIVED_FINE_GAMEWEEKS
+            standard_fee = Decimal('150.00')
 
             if paid < standard_fee:
                 bal = standard_fee - paid
@@ -355,7 +351,8 @@ def get_active_gw_flagged_summary(target_gw_num=None):
         'gw': target_gw,
         'all_gws': all_gws,
         'gw_state': gw_state,
-        'is_past_deadline': is_past_deadline,
+        'is_past_start': is_past_start,
+        'is_past_deadline': target_gw.is_past_deadline,
         'is_within_24h': is_within_24h,
         'time_left_seconds': time_left_seconds,
         'time_left_human': time_left_human,

@@ -182,9 +182,9 @@
                             </h3>
                             <p class="text-[10px] sm:text-[11px] {% if flagged_summary.is_within_24h %}text-amber-300/80{% else %}text-gray-400{% endif %}">
                                 {% if flagged_summary.is_within_24h %}
-                                ⏳ <strong>{{ flagged_summary.time_left_human }}</strong> before kickoff deadline!
+                                ⏳ <strong>{{ flagged_summary.time_left_human }}</strong> before Gameweek kickoff!
                                 {% else %}
-                                {{ flagged_summary.time_left_human }} until deadline.
+                                {{ flagged_summary.time_left_human }} until Gameweek kickoff.
                                 {% endif %}
                             </p>
                         </div>

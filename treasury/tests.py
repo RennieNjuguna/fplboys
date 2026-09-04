@@ -47,16 +47,31 @@ class TreasuryFinancialTests(TestCase):
         self.assertEqual(p.late_fine_amount, Decimal('0.00'))
 
     def test_late_payment_auto_fine_on_standard_gw(self):
-        """Payment received after deadline on standard GW has is_late=True and fine=50.00"""
-        p = Payment.objects.create(
+        """
+        Payment received before GW kickoff (within 90m transfer window) is on-time (is_late=False).
+        Payment received strictly after the first match kicks off (gw.start_time) has is_late=True and fine=50.00.
+        """
+        # On-time during 90m transfer closure before kickoff
+        p_ontime = Payment.objects.create(
+            member=self.m1,
+            gameweek=self.gw3,
+            amount_paid=Decimal('150.00'),
+            timestamp_received=self.deadline + timedelta(minutes=45),
+            mpesa_code="ONTIME123"
+        )
+        self.assertFalse(p_ontime.is_late)
+        self.assertEqual(p_ontime.late_fine_amount, Decimal('0.00'))
+
+        # Late after kickoff (start_time = deadline + 90m)
+        p_late = Payment.objects.create(
             member=self.m2,
             gameweek=self.gw3,
             amount_paid=Decimal('200.00'),
-            timestamp_received=self.deadline + timedelta(hours=1),
+            timestamp_received=self.deadline + timedelta(hours=2),
             mpesa_code="LATE123"
         )
-        self.assertTrue(p.is_late)
-        self.assertEqual(p.late_fine_amount, Decimal('50.00'))
+        self.assertTrue(p_late.is_late)
+        self.assertEqual(p_late.late_fine_amount, Decimal('50.00'))
 
     def test_fine_waiver_for_gw1_gw2_gw19_gw38(self):
         """Payments after deadline for GW1 and GW2 have fine waived (is_late=False, fine=0)"""
@@ -786,6 +801,52 @@ class TreasuryFinancialTests(TestCase):
         p3 = Payment.objects.get(member=self.m2, gameweek=self.gw3)
         self.assertEqual(p3.amount_paid, Decimal('100.00')) # GW3 received the remaining 100
         self.assertIn("TOPUP150", p3.mpesa_code)
+
+    def test_flagged_at_gw_start_kickoff_not_deadline(self):
+        """
+        Tests that:
+        1. Gameweek.start_time is 90 minutes after Gameweek.deadline_time.
+        2. A member who pays within the 90m window between deadline and kickoff is ON-TIME (is_late=False).
+        3. A member who pays after the first match kicks off is LATE (is_late=True, late_fine=50).
+        4. In the Active Radar, a member is NOT in Flagged Defaulters when transfers close (90m before kickoff),
+           but only becomes flagged once the match actually starts.
+        """
+        from treasury.services.ledger_matrix import get_active_gw_flagged_summary
+        # Create GW5 with deadline 1 hour ago (so deadline has passed, but match has NOT kicked off since kickoff is in 30 mins)
+        now = timezone.now()
+        gw_kickoff_soon = Gameweek.objects.create(
+            number=5,
+            name="Gameweek 5",
+            deadline_time=now - timedelta(minutes=60),  # Deadline passed 60m ago
+            status='upcoming'
+        )
+        # Verify kickoff is 90 mins after deadline (so kickoff is in 30 mins)
+        self.assertEqual(gw_kickoff_soon.start_time, gw_kickoff_soon.deadline_time + timedelta(minutes=90))
+        self.assertTrue(gw_kickoff_soon.is_past_deadline)
+        self.assertFalse(gw_kickoff_soon.is_past_start)
+
+        # Payment made now (between deadline and kickoff)
+        p = Payment.objects.create(
+            member=self.m1,
+            gameweek=gw_kickoff_soon,
+            amount_paid=Decimal('150.00'),
+            timestamp_received=now,
+            mpesa_code="TRANSFER_CLOSURE_PAY"
+        )
+        # Should NOT be late since match hasn't started yet!
+        self.assertFalse(p.is_late)
+        self.assertEqual(p.late_fine_amount, Decimal('0.00'))
+
+        # Payment made 2 hours after kickoff
+        p_late = Payment.objects.create(
+            member=self.m2,
+            gameweek=gw_kickoff_soon,
+            amount_paid=Decimal('200.00'),
+            timestamp_received=gw_kickoff_soon.start_time + timedelta(hours=2),
+            mpesa_code="POST_KICKOFF_PAY"
+        )
+        self.assertTrue(p_late.is_late)
+        self.assertEqual(p_late.late_fine_amount, Decimal('50.00'))
 
 
 

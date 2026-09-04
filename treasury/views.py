@@ -513,8 +513,8 @@ def api_check_deadline(request):
 
     is_waived = gw.number in (1, 2, 19, 38)
     is_late = False
-    if gw.deadline_time and ts and not is_waived:
-        is_late = ts > gw.deadline_time
+    if gw.start_time and ts and not is_waived:
+        is_late = ts > gw.start_time
 
     late_fine = Decimal('50.00') if is_late else Decimal('0.00')
 
@@ -537,7 +537,7 @@ def api_check_deadline(request):
         recommended_amount = standard_due
 
     eat_tz = pytz.timezone('Africa/Nairobi')
-    dl_local = gw.deadline_time.astimezone(eat_tz).strftime('%b %d, %Y at %I:%M %p EAT') if gw.deadline_time else 'N/A'
+    dl_local = gw.start_time_eat.strftime('%b %d, %Y at %I:%M %p EAT') if gw.start_time else 'N/A'
 
     if member and has_existing and existing_paid < standard_due:
         msg = f"ℹ️ {member.manager_name} has existing partial payment of Ksh. {existing_paid:,.2f} on {gw.name}. New payment will complete {gw.name} (Bal: Ksh. {balance_due:,.2f}) and cascade any excess to next GWs via FIFO."
@@ -553,9 +553,9 @@ def api_check_deadline(request):
         }.get(gw.number, "Waiver Gameweek")
         msg = f"🎁 {gw.name} Fine Waiver ({waiver_reason}): No late fine applies."
     elif is_late:
-        msg = f"⚠️ Payment timestamp is after {gw.name} deadline ({dl_local}). Ksh. 50 Late Fine applied (Total: Ksh. 200)."
+        msg = f"⚠️ Payment timestamp is after {gw.name} start / kickoff ({dl_local}). Ksh. 50 Late Fine applied (Total: Ksh. 200)."
     else:
-        msg = f"✅ On-time FIFO payment starting at {gw.name} (Deadline: {dl_local})."
+        msg = f"✅ On-time FIFO payment starting at {gw.name} (Kickoff: {dl_local})."
 
     return JsonResponse({
         'is_late': is_late,
