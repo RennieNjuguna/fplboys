@@ -411,7 +411,13 @@
                                 <div class="font-bold text-[10px] sm:text-[11px] text-rose-400">
                                     ✗ Due
                                 </div>
+                                {% if cell.late_fine > 0 %}
+                                <div class="text-[8px] text-rose-300 font-bold" title="Unpaid contribution (Ksh. 150) + Ksh. 50 late fine into BBQ Pot">Ksh. 200 (+50)</div>
+                                {% elif cell.is_waived %}
+                                <div class="text-[8px] text-purple-300/80 font-medium" title="Fine waived for this gameweek">Ksh. 150 (Waived)</div>
+                                {% else %}
                                 <div class="text-[8px] text-rose-300/80">Ksh. 150</div>
+                                {% endif %}
 
                                 {% elif cell.status == 'PARDON' %}
                                 <div class="font-bold text-[10px] sm:text-[11px] text-purple-300">

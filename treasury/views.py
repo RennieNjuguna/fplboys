@@ -9,7 +9,7 @@ import pytz
 
 from league.models import Member, Gameweek, GameweekResult
 from league.services.fpl_client import FPLSyncService
-from treasury.models import Payment, AuditLog, TreasuryConfig, PrizePayout, PaymentTransaction
+from treasury.models import Payment, AuditLog, TreasuryConfig, PrizePayout, PaymentTransaction, WAIVED_FINE_GAMEWEEKS
 
 from treasury.forms import PaymentForm, LogMpesaPaymentForm
 from treasury.services.ledger_matrix import build_financial_ledger_matrix, get_active_gw_flagged_summary
@@ -529,7 +529,7 @@ def api_check_deadline(request):
     if not gw:
         return JsonResponse({'error': 'No gameweek available'}, status=400)
 
-    is_waived = gw.number in (1, 2, 19, 38)
+    is_waived = gw.number in WAIVED_FINE_GAMEWEEKS
     is_late = False
     if gw.start_time and ts and not is_waived:
         is_late = ts > gw.start_time

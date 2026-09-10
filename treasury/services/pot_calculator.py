@@ -101,7 +101,7 @@ def get_member_financial_leaderboard():
         total_won = won_agg['total_won'] or Decimal('0.00')
         top3_count = won_agg['top3_count'] or 0
 
-        net_pl = Decimal(str(total_won)) - total_paid
+        net_pl = Decimal(str(total_won)) - total_paid - total_fines
 
         # Overall points
         total_points = m.total_overall_points

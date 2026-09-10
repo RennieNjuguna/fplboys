@@ -3,7 +3,7 @@ from decimal import Decimal
 from django.utils import timezone
 from django.db import connection, transaction
 from league.models import Gameweek, GameweekResult, Member
-from treasury.models import Payment
+from treasury.models import Payment, WAIVED_FINE_GAMEWEEKS
 from news.models import RoastEdition, ManagerRoastItem
 
 
@@ -309,10 +309,16 @@ def generate_roast_edition(gameweek: Gameweek, force_update=True) -> RoastEditio
     )
 
     # Defaulter roast / waiver rules
-    if gw_num in [1, 2]:
+    if gw_num in WAIVED_FINE_GAMEWEEKS:
+        waiver_name = {
+            1: "GW 1 & GW 2 Season Kickoff",
+            2: "GW 1 & GW 2 Early Season Setup",
+            19: "GW 19 Mid-Season Holiday",
+            38: "GW 38 Season Finale",
+        }.get(gw_num, f"GW {gw_num}")
         defaulter_roast = (
-            f"🚨 LEAGUE GRACE PERIOD (GW {gw_num}): The League Committee has officially declared a full grace period for GW 1 & GW 2! "
-            f"Zero late penalty fines apply for all managers. Defaulters get a clean slate for the opening fortnight—strict Ksh. 50 fines will be enforced by the Treasurer starting GW 3!"
+            f"🚨 LEAGUE FINE WAIVER ({waiver_name}): The League Committee has officially declared a fine waiver for GW {gw_num}! "
+            f"Zero late penalty fines apply for all managers on this gameweek."
         )
     else:
         # Check actual late payments

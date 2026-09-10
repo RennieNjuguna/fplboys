@@ -50,6 +50,7 @@ def build_financial_ledger_matrix(max_gws=38):
             prize_won = Decimal(str(gw_res.gw_prize_won)) if gw_res else Decimal('0.00')
             net_points = gw_res.net_points if gw_res else 0
 
+            gw_waived = gw.number in WAIVED_FINE_GAMEWEEKS
             standard_due = Decimal('150.00')
             if is_pardon:
                 amount_paid = Decimal('0.00')
@@ -61,12 +62,19 @@ def build_financial_ledger_matrix(max_gws=38):
                 late_fine = payment.late_fine_amount if payment.is_late else Decimal('0.00')
                 balance_due = max(Decimal('0.00'), standard_due - amount_paid)
                 
-                if payment.is_late:
+                # If partial payment on a finished/started non-waived GW where full 150 wasn't met:
+                if amount_paid < standard_due and is_due and not gw_waived and late_fine == Decimal('0.00'):
+                    late_fine = Decimal('50.00')
+
+                if payment.is_late or (late_fine > 0 and amount_paid >= standard_due):
                     status = 'LATE'
                     row_late_count += 1
                     col_totals[gw.id]['late_count'] += 1
                 elif amount_paid < standard_due:
                     status = 'PARTIAL'
+                    if late_fine > 0:
+                        row_late_count += 1
+                        col_totals[gw.id]['late_count'] += 1
                 else:
                     status = 'PAID'
                     col_totals[gw.id]['paid_count'] += 1
@@ -77,12 +85,14 @@ def build_financial_ledger_matrix(max_gws=38):
                 col_totals[gw.id]['total_fines'] += late_fine
             else:
                 amount_paid = Decimal('0.00')
-                late_fine = Decimal('0.00')
+                late_fine = Decimal('0.00') if gw_waived else (Decimal('50.00') if is_due else Decimal('0.00'))
                 balance_due = standard_due if is_due else Decimal('0.00')
                 if is_due:
                     status = 'UNPAID'
                     row_unpaid_count += 1
                     col_totals[gw.id]['unpaid_count'] += 1
+                    row_total_fines += late_fine
+                    col_totals[gw.id]['total_fines'] += late_fine
                 else:
                     status = 'UPCOMING'
 

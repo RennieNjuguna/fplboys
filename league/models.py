@@ -69,7 +69,7 @@ class Member(models.Model):
         """
         Net Profit/Loss = Total Prizes Won - (Total Standard Contributions Paid + Total Fines Paid)
         """
-        return self.total_prizes_won - self.total_paid_contributions
+        return self.total_prizes_won - self.total_paid_contributions - self.total_fines_incurred
 
 
 class Gameweek(models.Model):

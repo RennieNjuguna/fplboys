@@ -74,7 +74,8 @@ class TreasuryFinancialTests(TestCase):
         self.assertEqual(p_late.late_fine_amount, Decimal('50.00'))
 
     def test_fine_waiver_for_gw1_gw2_gw19_gw38(self):
-        """Payments after deadline for GW1 and GW2 have fine waived (is_late=False, fine=0)"""
+        """Payments after deadline for GW1, GW2, GW19, GW38 have fine waived (is_late=False, fine=0)"""
+        # GW1
         p1 = Payment.objects.create(
             member=self.m1,
             gameweek=self.gw1,
@@ -85,6 +86,7 @@ class TreasuryFinancialTests(TestCase):
         self.assertFalse(p1.is_late)
         self.assertEqual(p1.late_fine_amount, Decimal('0.00'))
 
+        # GW2
         p2 = Payment.objects.create(
             member=self.m2,
             gameweek=self.gw2,
@@ -94,6 +96,41 @@ class TreasuryFinancialTests(TestCase):
         )
         self.assertFalse(p2.is_late)
         self.assertEqual(p2.late_fine_amount, Decimal('0.00'))
+
+        # GW19
+        gw19 = Gameweek.objects.create(number=19, name="Gameweek 19", deadline_time=self.deadline, status='finished')
+        p19 = Payment.objects.create(
+            member=self.m1,
+            gameweek=gw19,
+            amount_paid=Decimal('150.00'),
+            timestamp_received=self.deadline + timedelta(hours=12),
+            mpesa_code="WAIVED19"
+        )
+        self.assertFalse(p19.is_late)
+        self.assertEqual(p19.late_fine_amount, Decimal('0.00'))
+
+        # GW38
+        gw38 = Gameweek.objects.create(number=38, name="Gameweek 38", deadline_time=self.deadline, status='finished')
+        p38 = Payment.objects.create(
+            member=self.m2,
+            gameweek=gw38,
+            amount_paid=Decimal('150.00'),
+            timestamp_received=self.deadline + timedelta(hours=24),
+            mpesa_code="WAIVED38"
+        )
+        self.assertFalse(p38.is_late)
+        self.assertEqual(p38.late_fine_amount, Decimal('0.00'))
+
+        # Standard non-waived GW (e.g. GW3) MUST incur fine
+        p3_late = Payment.objects.create(
+            member=self.m1,
+            gameweek=self.gw3,
+            amount_paid=Decimal('200.00'),
+            timestamp_received=self.deadline + timedelta(hours=5),
+            mpesa_code="NOT_WAIVED_GW3"
+        )
+        self.assertTrue(p3_late.is_late)
+        self.assertEqual(p3_late.late_fine_amount, Decimal('50.00'))
 
     def test_pot_breakdown_and_fine_routing_to_bbq(self):
         Payment.objects.create(
@@ -130,7 +167,7 @@ class TreasuryFinancialTests(TestCase):
         Payment.objects.create(
             member=self.m2,
             gameweek=self.gw3,
-            amount_paid=Decimal('200.00'),
+            amount_paid=Decimal('150.00'),
             timestamp_received=self.deadline + timedelta(hours=2),
             mpesa_code="CODE2"
         )
@@ -161,6 +198,8 @@ class TreasuryFinancialTests(TestCase):
 
         self.assertEqual(m1_stat['net_pl'], Decimal('100.00'))
         self.assertEqual(m2_stat['net_pl'], Decimal('-200.00'))
+        self.assertEqual(self.m1.net_profit_loss, Decimal('100.00'))
+        self.assertEqual(self.m2.net_profit_loss, Decimal('-200.00'))
         self.assertEqual(leaderboard[0]['member'], self.m1)
 
     def test_public_financial_ledger_access(self):
@@ -847,6 +886,57 @@ class TreasuryFinancialTests(TestCase):
         )
         self.assertTrue(p_late.is_late)
         self.assertEqual(p_late.late_fine_amount, Decimal('50.00'))
+
+    def test_matrix_fine_waiver_gw1_gw2_and_strict_fines_gw3(self):
+        """
+        Verifies that in build_financial_ledger_matrix():
+        1. Waived Gameweeks (GW 1, 2, 19, 38) assess 0.00 late fines for unpaid/late members.
+        2. Standard Gameweeks (e.g. GW 3) strictly assess 50.00 late fines for unpaid defaulters.
+        3. Column totals for GW 1 & 2 have total_fines = 0.00, while GW 3 has total_fines = 50.00 per defaulter.
+        """
+        from treasury.services.ledger_matrix import build_financial_ledger_matrix
+
+        # m1 is paid on time for GW1, GW2, GW3
+        Payment.objects.create(
+            member=self.m1, gameweek=self.gw1, amount_paid=Decimal('150.00'),
+            timestamp_received=self.deadline - timedelta(days=1), verified=True
+        )
+        Payment.objects.create(
+            member=self.m1, gameweek=self.gw2, amount_paid=Decimal('150.00'),
+            timestamp_received=self.deadline - timedelta(days=1), verified=True
+        )
+        Payment.objects.create(
+            member=self.m1, gameweek=self.gw3, amount_paid=Decimal('150.00'),
+            timestamp_received=self.deadline - timedelta(days=1), verified=True
+        )
+
+        # m2 is UNPAID for GW1, GW2, GW3
+        matrix = build_financial_ledger_matrix(max_gws=3)
+        m2_row = next(r for r in matrix['rows'] if r['member'] == self.m2)
+
+        cell_gw1 = next(c for c in m2_row['cells'] if c['gw_number'] == 1)
+        cell_gw2 = next(c for c in m2_row['cells'] if c['gw_number'] == 2)
+        cell_gw3 = next(c for c in m2_row['cells'] if c['gw_number'] == 3)
+
+        # GW 1 & 2 are waived: fine = 0.00
+        self.assertTrue(cell_gw1['is_waived'])
+        self.assertEqual(cell_gw1['late_fine'], Decimal('0.00'))
+        self.assertTrue(cell_gw2['is_waived'])
+        self.assertEqual(cell_gw2['late_fine'], Decimal('0.00'))
+
+        # GW 3 is NOT waived: late fine = 50.00
+        self.assertFalse(cell_gw3['is_waived'])
+        self.assertEqual(cell_gw3['late_fine'], Decimal('50.00'))
+
+        # Column summaries
+        col_gw1 = next(c for c in matrix['column_summaries'] if c['gw'].number == 1)
+        col_gw2 = next(c for c in matrix['column_summaries'] if c['gw'].number == 2)
+        col_gw3 = next(c for c in matrix['column_summaries'] if c['gw'].number == 3)
+
+        self.assertEqual(col_gw1['total_fines'], Decimal('0.00'))
+        self.assertEqual(col_gw2['total_fines'], Decimal('0.00'))
+        self.assertEqual(col_gw3['total_fines'], Decimal('50.00'))
+
 
 
 
