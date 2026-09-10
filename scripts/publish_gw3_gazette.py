@@ -25,7 +25,7 @@ def publish_gw3():
 
     editorial_lead = (
         "Gameweek 3 delivered sensational footballing drama and hilarious tactical calamities across the 10-man battleground. "
-        "Leading from the front with supreme poise, Dennis Njuguna ('DenniSkills') conquered the gameweek with 59 net points—relying on captain Erling Haaland and defensive gems Marc Guéhi and Ryan Giles to claim 1st place and bank Ksh. 250.00 in prize money! "
+        "Leading from the front with supreme poise, Torque Dennis ('DenniSkills') conquered the gameweek with 59 net points—relying on captain Erling Haaland and defensive gems Marc Guéhi and Ryan Giles to claim 1st place and bank Ksh. 250.00 in prize money! "
         "Close behind on the podium, aggressive early Wildcards paid off handsomely: Aron Mangati captured 2nd place (57 pts) for Ksh. 166.67, while Marvin Owino orchestrated a stunning Don Bosco revival to take 3rd place (56 pts) and pocket Ksh. 83.33. "
         "On the comedic front, Marve Mathingu delivered the ultimate banter masterclass by burning an 8-point transfer hit only to Triple Captain Rayan Cherki for a tragic 9 points total. "
         "Meanwhile, King Chris endured an unforgettable horror show: captaining Bruno Fernandes for 4 points while standing as the SOLE unpaid defaulter in the entire league! "
@@ -37,7 +37,7 @@ def publish_gw3():
 
     king = dennis
     king_reason = (
-        "Dennis 'DenniSkills' Njuguna delivered pure tactical perfection with 59 net points (zero hits, zero chips) to claim the GW 3 crown and Ksh. 250.00 cash prize!"
+        "Torque Dennis ('DenniSkills') delivered pure tactical perfection with 59 net points (zero hits, zero chips) to claim the GW 3 crown and Ksh. 250.00 cash prize!"
     )
 
     clown = renny
@@ -114,7 +114,7 @@ def publish_gw3():
             'rank': 1,
             'net_pts': 59,
             'badge': '👑 1ST PLACE (GW CHAMPION)',
-            'title': "Dennis Njuguna - 'DenniSkills' Tactical Masterclass & Cash King",
+            'title': "Torque Dennis - 'DenniSkills' Tactical Masterclass & Cash King",
             'body': "Pure class without burning a single chip or transfer hit. Dennis trusted Erling Haaland with the armband (18 pts), while Marc Guéhi (8 pts) and Ryan Giles (8 pts) formed an impenetrable defensive foundation to deliver 59 net points and bank Ksh. 250.00. A deserved champion at the 10-man summit!",
             'verdict': "Verdict: Undisputed GW 3 Champion & Cash King (Ksh. 250.00)",
         },
