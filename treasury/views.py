@@ -123,37 +123,53 @@ def treasurer_portal_view(request):
                 messages.error(request, f"FPL sync error: {e}")
             return redirect('treasurer_portal')
 
-        elif action == 'generate_roasts':
+        elif action in ['generate_roasts', 'publish_gazette']:
+            target_gw_str = request.POST.get('target_gw') or request.POST.get('gw')
             try:
                 from news.services.roast_engine import ensure_news_tables_exist, generate_roast_edition
+                from news.services.gazette_storage import load_edition_from_disk, sync_all_stored_editions
                 ensure_news_tables_exist()
 
-                from django.core.management import call_command
-                try:
-                    call_command('migrate', interactive=False)
-                except Exception:
-                    pass
+                if target_gw_str:
+                    target_gw_num = int(target_gw_str)
+                    # Try loading curated edition from disk first
+                    ed = load_edition_from_disk(target_gw_num, force_publish=True)
+                    if not ed:
+                        target_gw = Gameweek.objects.filter(number=target_gw_num).first()
+                        if target_gw:
+                            ed = generate_roast_edition(target_gw, force_update=True)
+                    
+                    if ed:
+                        messages.success(request, f"📰 Published Gazette Issue #{ed.edition_number} (GW {ed.gameweek.number}) successfully!")
+                    else:
+                        messages.warning(request, f"Could not find or generate Gazette for Gameweek {target_gw_str}.")
 
-                gws_with_results = Gameweek.objects.filter(results__isnull=False).distinct().order_by('number')
-                count = 0
-                for gw in gws_with_results:
-                    try:
-                        generate_roast_edition(gw, force_update=True)
-                        count += 1
-                    except Exception:
-                        pass
-
-                if count > 0:
-                    messages.success(request, f"📰 Published {count} Gazette issue(s) successfully!")
                 else:
+                    # Publish latest finished/active gameweek only (never loop & overwrite all)
                     latest_gw = Gameweek.objects.filter(status__in=['finished', 'active']).order_by('-number').first()
                     if latest_gw:
-                        ed = generate_roast_edition(latest_gw, force_update=True)
-                        messages.success(request, f"📰 Published The Gazette Issue #{ed.edition_number} for GW {latest_gw.number}!")
+                        ed = load_edition_from_disk(latest_gw.number, force_publish=True)
+                        if not ed:
+                            ed = generate_roast_edition(latest_gw, force_update=True)
+                        messages.success(request, f"📰 Published Gazette Issue #{ed.edition_number} for GW {latest_gw.number}!")
                     else:
-                        messages.warning(request, "No gameweek results found. Make sure to sync with FPL first.")
+                        messages.warning(request, "No finished or active gameweek found. Sync with FPL first.")
             except Exception as e:
                 messages.error(request, f"Error publishing Gazette: {e}")
+            return redirect('treasurer_portal')
+
+        elif action == 'toggle_publish_issue':
+            edition_id = request.POST.get('edition_id')
+            if edition_id:
+                try:
+                    from news.models import RoastEdition
+                    ed = RoastEdition.objects.get(pk=edition_id)
+                    ed.is_published = not ed.is_published
+                    ed.save(update_fields=['is_published'])
+                    status_text = "Published" if ed.is_published else "Unpublished (Draft)"
+                    messages.success(request, f"📰 Gazette Issue #{ed.edition_number} is now {status_text}.")
+                except Exception as e:
+                    messages.error(request, f"Error updating issue status: {e}")
             return redirect('treasurer_portal')
 
         elif action == 'delete_issue':
@@ -284,6 +300,8 @@ def treasurer_portal_view(request):
     # Gazette editions list for management
     gazette_editions = []
     try:
+        from news.services.gazette_storage import sync_all_stored_editions
+        sync_all_stored_editions()
         from news.models import RoastEdition
         gazette_editions = list(RoastEdition.objects.select_related('gameweek').order_by('-edition_number'))
     except Exception:

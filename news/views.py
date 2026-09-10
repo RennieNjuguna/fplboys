@@ -3,6 +3,7 @@ from django.http import JsonResponse
 from league.models import Gameweek
 from news.models import RoastEdition, ManagerRoastItem
 from news.services.roast_engine import generate_roast_edition, ensure_news_tables_exist
+from news.services.gazette_storage import sync_all_stored_editions, load_edition_from_disk
 
 
 from django.contrib import messages
@@ -11,19 +12,32 @@ def gazette_view(request):
     """
     Renders The FPL Boys Gazette newspaper layout with issue selector,
     breaking news ticker, brutal roast cards, classifieds, and PDF export.
+    Automatically syncs any version-controlled JSON editions from git.
     """
     ensure_news_tables_exist()
+    is_admin = bool(request.user.is_authenticated or request.session.get('treasury_admin_authenticated'))
     all_editions = []
     selected_edition = None
     manager_roasts = []
 
     try:
-        all_editions = list(RoastEdition.objects.filter(is_published=True).select_related('gameweek').order_by('-edition_number'))
+        # Guarantee any git-pulled JSON edition files are loaded into SQLite
+        sync_all_stored_editions()
+
+        if is_admin:
+            all_editions = list(RoastEdition.objects.select_related('gameweek').order_by('-edition_number'))
+        else:
+            all_editions = list(RoastEdition.objects.filter(is_published=True).select_related('gameweek').order_by('-edition_number'))
+
         selected_gw_num = request.GET.get('gw')
 
         if selected_gw_num:
             try:
-                selected_edition = RoastEdition.objects.filter(edition_number=int(selected_gw_num), is_published=True).first()
+                gw_int = int(selected_gw_num)
+                if is_admin:
+                    selected_edition = RoastEdition.objects.filter(edition_number=gw_int).first()
+                else:
+                    selected_edition = RoastEdition.objects.filter(edition_number=gw_int, is_published=True).first()
             except (ValueError, TypeError):
                 selected_edition = None
 
@@ -41,6 +55,7 @@ def gazette_view(request):
         'all_editions': all_editions,
         'selected_edition': selected_edition,
         'manager_roasts': manager_roasts,
+        'is_admin': is_admin,
     }
     return render(request, 'news/gazette.html', context)
 

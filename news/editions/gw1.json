@@ -1,0 +1,132 @@
+{
+  "edition_number": 1,
+  "gameweek_number": 1,
+  "headline": "GW 1 CROWN: MARVE MATHINGU CLAIMS SUPREME GLORY AS MARVIN OWINO ANCHORS THE CLOWN CAR!",
+  "subheadline": "Official Issue #1: Masterclass at the summit, carnage at the bottom, and an unfiltered autopsy of the weekend.",
+  "publish_date": "2026-09-01T11:31:47.070545+00:00",
+  "chief_editor": "The League Scribe & Chief Correspondent",
+  "weather_report": "Clear skies at the top of the table. Relegation zone experiencing severe thunder and tactical depression.",
+  "editorial_lead": "Welcome to Issue #1 of The FPL Boys Gazette! Gameweek 1 kicked off with high drama and tactical showdowns across all 10 managers. Leading from the front, Marve Mathingu (Marve of the Match) put on a championship display, amassing a league-high 61 points to secure top honors and pocket Ksh. 250.00 in prize money. However, for every champion standing proudly on the podium, there is a casualty in the trenches. At the very bottom of the table, Marvin Owino (Don Bosco) suffered a complete tactical meltdown with only 36 points, officially earning the unwanted wooden spoon. Read through the full breakdown below for the complete manager-by-manager autopsy!",
+  "clown_of_the_week_name": "Marvin Owino",
+  "clown_reason": "Marvin Owino collapsed to rank #9 with just 36 points. A textbook disasterclass that will be studied in tactical defense academies as what NOT to do.",
+  "king_of_the_week_name": "Marve Mathingu",
+  "king_reason": "Marve Mathingu dominated the round with 61 net points, bagging Ksh. 250.00. An imperious showing that sets the early benchmark for the rest of the league to chase!",
+  "quote_of_the_week": "\"My rank is only temporary. By Gameweek 38, they will see the vision.\" — Marvin Owino",
+  "quote_author": "Marvin Owino (Post-Match Presser)",
+  "defaulter_roast": "🚨 LEAGUE GRACE PERIOD (GW 1): The League Committee has officially declared a full grace period for GW 1 & GW 2! Zero late penalty fines apply for all managers. Defaulters get a clean slate for the opening fortnight—strict Ksh. 50 fines will be enforced by the Treasurer starting GW 3!",
+  "transfer_hit_roast": "Season Kickoff Window: All 10 managers launched with unlimited free squad selections prior to the GW 1 deadline. Point-deducting transfer hits unlock from GW 2 onward, where panic transfers and tactical chaos will officially commence!",
+  "classified_ads": [],
+  "is_published": true,
+  "manager_roasts": [
+    {
+      "manager_name": "Marve Mathingu",
+      "team_name": "Marve of the Match",
+      "rank_in_gw": 1,
+      "net_points": 61,
+      "badge": "👑 1ST PLACE (CHAMPION)",
+      "roast_title": "Marve Mathingu - Truly The 'Marve of the Match'",
+      "roast_body": "Living up to his team name with supreme swagger, Marve delivered the ultimate masterclass with 61 points. Sits proudly atop the 10-man summit and banks Ksh. 250.00.",
+      "verdict": "Verdict: Certified Marve of the Match & Cash King",
+      "order": 1
+    },
+    {
+      "manager_name": "Samuel Wambua",
+      "team_name": "maggry shiners fc",
+      "rank_in_gw": 2,
+      "net_points": 56,
+      "badge": "🥈 2ND PLACE (SILVER)",
+      "roast_title": "Samuel Wambua - 'maggry shiners' Bag The Podium Cash",
+      "roast_body": "Samuel's 'maggry shiners fc' shone under the lights with 56 points, clinching 🥈 place and Ksh. 166.67.",
+      "verdict": "Verdict: Silver Shiner & Title Contender",
+      "order": 2
+    },
+    {
+      "manager_name": "Renny Muragu",
+      "team_name": "The Young Ones",
+      "rank_in_gw": 3,
+      "net_points": 55,
+      "badge": "🥉 3RD PLACE (BRONZE)",
+      "roast_title": "Renny Muragu - The Young Ones Schooling The Elders",
+      "roast_body": "Renny's 'The Young Ones' showed mature nerve with 55 points to pocket Ksh. 83.33 on the podium.",
+      "verdict": "Verdict: Clutch Podium Scrapper",
+      "order": 3
+    },
+    {
+      "manager_name": "Torque Dennis",
+      "team_name": "DenniSkills",
+      "rank_in_gw": 4,
+      "net_points": 52,
+      "badge": "💔 4TH PLACE (HEARTBREAK)",
+      "roast_title": "Torque Dennis - 'DenniSkills' In The Heartbreak Hotel",
+      "roast_body": "Dennis brought pure skill with 52 points, but 'DenniSkills' missed out on the podium money by a razor-thin margin. High skill, zero shillings.",
+      "verdict": "Verdict: High Skill, Zero Shillings",
+      "order": 4
+    },
+    {
+      "manager_name": "King Chris",
+      "team_name": "The_Painter..",
+      "rank_in_gw": 5,
+      "net_points": 50,
+      "badge": "😴 RANK #5 (MID-TABLE)",
+      "roast_title": "King Chris - The Painter Strokes A Neutral Canvas",
+      "roast_body": "King Chris entered with royal ambitions, but 'The_Painter..' painted a very beige mid-table portrait with 50 points.",
+      "verdict": "Verdict: 50/50 Mid-Table Masterpiece",
+      "order": 5
+    },
+    {
+      "manager_name": "Erick Muchira",
+      "team_name": "mambaaa",
+      "rank_in_gw": 5,
+      "net_points": 50,
+      "badge": "😴 RANK #5 (MID-TABLE)",
+      "roast_title": "Erick Muchira - 'mambaaa' Strikes Without Venom",
+      "roast_body": "Erick's 'mambaaa' didn't deliver the fatal bite promised, slithering into rank #5 with 50 points.",
+      "verdict": "Verdict: Harmless Grass Snake",
+      "order": 5
+    },
+    {
+      "manager_name": "Benn Mwangi",
+      "team_name": "Odysseus Reign",
+      "rank_in_gw": 7,
+      "net_points": 47,
+      "badge": "😴 RANK #7 (MID-TABLE)",
+      "roast_title": "Benn Mwangi - Minimalist Name, Minimalist Points",
+      "roast_body": "With a team name as creatively minimal as 'Odysseus Reign', his 47-point tally was equally subdued at rank #7.",
+      "verdict": "Verdict: Needs Tactical Ignition",
+      "order": 7
+    },
+    {
+      "manager_name": "Bright Ottore",
+      "team_name": "Phill Me In FC",
+      "rank_in_gw": 8,
+      "net_points": 45,
+      "badge": "💀 RANK #8 (RELEGATION TRENCH)",
+      "roast_title": "Bright Ottore - 'Phill Me In' Got Filled With Regret",
+      "roast_body": "Bright was anything but cheerful as 'Phill Me In FC' got thoroughly dismantled for 45 points at rank #8.",
+      "verdict": "Verdict: Sinking in the Trench",
+      "order": 8
+    },
+    {
+      "manager_name": "Marvin Owino",
+      "team_name": "Don Bosco",
+      "rank_in_gw": 9,
+      "net_points": 36,
+      "badge": "🤡 CLOWN OF THE GAMEWEEK",
+      "roast_title": "Marvin Owino - 'Don Bosco' In Urgent Need Of Prayers",
+      "roast_body": "The undisputed Clown of the Gameweek! Marvin's 'Don Bosco' crashed and burned with 36 points. Emergency pilgrimage to Don Bosco church advised.",
+      "verdict": "Verdict: Undisputed Wooden Spoon Clown",
+      "order": 9
+    },
+    {
+      "manager_name": "Aron Mangati",
+      "team_name": "Arons",
+      "rank_in_gw": 10,
+      "net_points": 0,
+      "badge": "🆕 JOINED GW 2 (PARDON)",
+      "roast_title": "Aron Mangati - Official GW 1 Pardon",
+      "roast_body": "Aron Mangati entered the league starting Gameweek 2 and was granted an official committee pardon for GW 1. Zero points recorded, zero contributions owed, and ready to battle from GW 2 onward!",
+      "verdict": "Verdict: League Pardon / Joined GW 2",
+      "order": 10
+    }
+  ]
+}

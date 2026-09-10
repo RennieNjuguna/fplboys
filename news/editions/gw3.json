@@ -1,0 +1,153 @@
+{
+  "edition_number": 3,
+  "gameweek_number": 3,
+  "headline": "GW 3 MASSACRE: DENNIS REIGNS SUPREME, MARVE'S CHERKI TRIPLE CAPTAIN COMEDY, AND BRIGHT BENCHES 23 POINTS!",
+  "subheadline": "Issue #3 Broadsheet: Wildcard gambles galore, the ultimate Triple Captain catastrophe, Bruno captaincy tears, and the Wooden Spoon finds a new home.",
+  "publish_date": "2026-09-10T11:52:29.479771+00:00",
+  "chief_editor": "The League Scribe & Chief Banter Officer",
+  "weather_report": "Hailstorm of transfer hits, freezing temperatures on the bench, and scorching fires under unpaid defaulters.",
+  "editorial_lead": "Gameweek 3 delivered pure, unadulterated FPL theatre across our 10-man battleground. At the summit, Dennis Njuguna ('DenniSkills') showcased supreme tactical discipline, amassing 59 net points to conquer 1st place on the pitch. Meanwhile, Aron Mangati activated an aggressive early Wildcard to seize 2nd with 57 points, capitalizing on league payout eligibility to walk away with the cold hard Ksh. 250.00 cash prize! However, this week's history books belong to the comedic chaos: Marve Mathingu pulled the trigger on a Triple Captain chip on Rayan Cherki alongside an 8-point transfer hit—returning a tragic 9 points total from his chip. Not to be outdone, Bright Ottore continued his legendary benching tradition by leaving a mammoth 23 points stranded on his pine. At the bottom of the table, Renny Muragu's 'The Young Ones' collapsed to 37 net points with an unnecessary transfer hit, proudly taking possession of the GW 3 Wooden Spoon Clown Crown!",
+  "clown_of_the_week_name": "Renny Muragu",
+  "clown_reason": "Renny 'The Young Ones' Muragu crashed straight to the basement with a league-worst 37 net points after taking a -4 transfer hit. With 10 points left on the bench and zero tactical rescue from his squad, Renny takes home the GW 3 Wooden Spoon in style.",
+  "king_of_the_week_name": "Torque Dennis",
+  "king_reason": "Dennis 'DenniSkills' Njuguna conquered the round with 59 net points through textbook squad balance (Haaland captaincy + Marc Guéhi & Giles hauls). Special executive salute to Aron Mangati whose calculated Wildcard overhaul earned 57 points and secured the entire Ksh. 250.00 weekly prize pot!",
+  "quote_of_the_week": "\"Cherki had the underlying metrics in training. The algorithms just didn't translate to Premier League minutes.\" — Marve Mathingu",
+  "quote_author": "Marve Mathingu (Triple Captain Post-Mortem)",
+  "defaulter_roast": "🚨 TREASURY CRACKDOWN (GW 3): Grace period is officially OVER! Fines are now strictly enforced. Aron Mangati stands tall as the sole paid-up saint banking Ksh. 250.00 while the remaining 9 managers funded the communal treasury. Clear your balances immediately before the Treasurer sends bailiffs to your WhatsApp DM!",
+  "transfer_hit_roast": "💥 THE TRANSFER CASUALTY WARD: Gameweek 3 saw heavy hits! Marve took a brutal -8 point hit (paired with a Cherki 3x Captain disaster), while Renny burned -4 points only to finish dead last. Wildcard activations by Aron, Marvin, and Samuel spared them point penalties, but couldn't spare their pride.",
+  "classified_ads": [
+    {
+      "title": "WANTED: Working Triple Captain Button",
+      "desc": "Looking for an apology letter from Pep Guardiola and Rayan Cherki. Will trade for 8 transfer hit points.",
+      "contact": "Call 0700-CHERKI-HELP"
+    },
+    {
+      "title": "FOR RENT: Bright’s Luxury Bench",
+      "desc": "Accommodates 23 points in extreme comfort every weekend. Free refreshments provided for benched double-digit haulers.",
+      "contact": "Drop off at Phill Me In Subs Dept"
+    },
+    {
+      "title": "URGENT: Bruno Fernandes Search Party",
+      "desc": "Last seen running aimlessly for 2 points. If found by King Chris or Erick, please return the captain’s armband immediately.",
+      "contact": "M16 Lost & Found Desk"
+    },
+    {
+      "title": "TREASURY NOTICE: M-Pesa Lines Open",
+      "desc": "Avoid the Wall of Shame. Send your Ksh. 150 + fines before the committee freezes your Gameweek 4 assets.",
+      "contact": "M-Pesa Paybill / Treasurer"
+    }
+  ],
+  "is_published": true,
+  "manager_roasts": [
+    {
+      "manager_name": "Torque Dennis",
+      "team_name": "DenniSkills",
+      "rank_in_gw": 1,
+      "net_points": 59,
+      "badge": "👑 1ST PLACE (GW CHAMPION)",
+      "roast_title": "Dennis Njuguna - 'DenniSkills' Masterclass Conquers GW 3",
+      "roast_body": "Pure tactical brilliance without burning chips or transfer hits. Dennis trusted Erling Haaland with the armband for 18 points, while defensive gems Marc Guéhi (8 pts) and Ryan Giles (8 pts) fired him to the top of the table with 59 net points. Now if he only paid his treasury dues on time, his bank account would look as glorious as his rank!",
+      "verdict": "Verdict: Supreme Tactician on the Pitch, Defaulter in the Ledger",
+      "order": 1
+    },
+    {
+      "manager_name": "Aron Mangati",
+      "team_name": "Arons",
+      "rank_in_gw": 2,
+      "net_points": 57,
+      "badge": "💰 2ND PLACE & CASH KING",
+      "roast_title": "Aron Mangati - The Wildcard Heist & Sole Cash Winner",
+      "roast_body": "Aron pulled the Wildcard trigger in Gameweek 3 and completely revamped his squad for 57 points, riding Haaland's captaincy (18 pts) and clean returns from Donnarumma (7 pts) and Pedro Porro (7 pts). Best of all: as the only financially compliant manager in the money, Aron scoops the entire Ksh. 250.00 first-place prize pool all for himself!",
+      "verdict": "Verdict: Financial Mastermind & Wildcard King",
+      "order": 2
+    },
+    {
+      "manager_name": "Marvin Owino",
+      "team_name": "Don Bosco",
+      "rank_in_gw": 3,
+      "net_points": 56,
+      "badge": "🥉 3RD PLACE (DON BOSCO REVIVAL)",
+      "roast_title": "Marvin Owino - 'Don Bosco' Wildcard Miracle",
+      "roast_body": "The prayers at Don Bosco have been answered! Marvin activated his Wildcard chip and engineered a stunning podium finish with 56 net points. Alisson Becker (8 pts) and Joško Gvardiol (8 pts) stood tall alongside captain Haaland. A massive bounce-back from the trenches that puts the rest of the league on high alert.",
+      "verdict": "Verdict: Divine Wildcard Resurrection",
+      "order": 3
+    },
+    {
+      "manager_name": "Samuel Wambua",
+      "team_name": "maggry shiners fc",
+      "rank_in_gw": 4,
+      "net_points": 47,
+      "badge": "🃏 4TH PLACE (WILDCARD RESET)",
+      "roast_title": "Samuel Wambua - 'maggry shiners' Steady The Ship",
+      "roast_body": "Samuel was the third manager to smash the Wildcard button this week, locking in 47 points. Gvardiol (8 pts) and Tzolakis (6 pts) chipped in alongside the Norwegian cyborg. While he missed out on podium glory by 9 points, his squad restructuring gives him solid momentum heading into GW 4.",
+      "verdict": "Verdict: Restructured & Reloaded",
+      "order": 4
+    },
+    {
+      "manager_name": "King Chris",
+      "team_name": "The_Painter..",
+      "rank_in_gw": 5,
+      "net_points": 46,
+      "badge": "🎨 5TH PLACE (CAPTAIN FAIL)",
+      "roast_title": "King Chris - The Painter Trapped by Bruno's 4-Point Armband",
+      "roast_body": "A tragic case of armband remorse. King Chris had Bryan Mbeumo (8 pts), Kai Havertz (8 pts), and Pedro Porro (7 pts) firing on all cylinders, but gambled on Bruno Fernandes as captain for a pathetic 4-point return (while Haaland bagged 18). A proper captain choice would have easily put him in 1st place. The canvas was colorful, but the frame fell off.",
+      "verdict": "Verdict: Masterpiece Ruined by Bruno Armband",
+      "order": 5
+    },
+    {
+      "manager_name": "Bright Ottore",
+      "team_name": "Phill Me In FC",
+      "rank_in_gw": 6,
+      "net_points": 42,
+      "badge": "🪑 6TH PLACE (BENCH HOARDER)",
+      "roast_title": "Bright Ottore - 'Phill Me In' Benches an Astonishing 23 Points!",
+      "roast_body": "Bright is officially running the most luxurious bench in East Africa. For the second week running, his substitutes outscored half the league's starters, leaving an eye-watering 23 points stranded on the pine while settling for 42 net points on the field. If bench points counted for trophies, Bright would already be Premier League champion.",
+      "verdict": "Verdict: Grandmaster of Bench Regret",
+      "order": 6
+    },
+    {
+      "manager_name": "Marve Mathingu",
+      "team_name": "Marve of the Match",
+      "rank_in_gw": 6,
+      "net_points": 42,
+      "badge": "🤡 6TH PLACE (TRIPLE CAPTAIN DISASTER)",
+      "roast_title": "Marve Mathingu - The Rayan Cherki Triple Captain Catastrophe (-8 Hit)",
+      "roast_body": "We have witnessed the most audacious banter play in FPL Boys history! Marve swallowed a -8 point transfer hit and slapped his TRIPLE CAPTAIN chip on... Rayan Cherki. The result? A grand total of 9 points from the chip (3 pts x 3), completely cancelling out his transfer penalty. Tyrick Mitchell (15 pts) and Cody Gakpo (11 pts) wept as their hauls were wasted in mid-table obscurity.",
+      "verdict": "Verdict: Banter Hall of Fame Inductee",
+      "order": 7
+    },
+    {
+      "manager_name": "Erick Muchira",
+      "team_name": "mambaaa",
+      "rank_in_gw": 8,
+      "net_points": 41,
+      "badge": "🐍 8TH PLACE (BRUNO & BENCH BLUES)",
+      "roast_title": "Erick Muchira - 'mambaaa' Bitten by Bruno & 16 Benched Points",
+      "roast_body": "Erick suffered a double whammy in GW 3: handing Bruno Fernandes the captaincy for a measly 4 points, while simultaneously stranding 16 valuable points on his bench. Martin Ødegaard (10 pts) and Bryan Mbeumo (8 pts) tried their best, but 'mambaaa' slithered down into rank #8 with 41 net points.",
+      "verdict": "Verdict: Defanged Snake in the Relegation Zone",
+      "order": 8
+    },
+    {
+      "manager_name": "Benn Mwangi",
+      "team_name": "Odysseus Reign",
+      "rank_in_gw": 9,
+      "net_points": 40,
+      "badge": "💀 9TH PLACE (TACTICAL FROSTBITE)",
+      "roast_title": "Benn Mwangi - 'Odysseus Reign' Sinks to the Trench",
+      "roast_body": "After an explosive Gameweek 2 triumph, Benn came crashing down to earth with a freezing 40 net points in GW 3. Beyond captain Haaland's 18 points, the rest of Odysseus Reign combined for a sorrowful 22 points, while 10 points chilled on the bench. The reign has entered a dark tactical winter.",
+      "verdict": "Verdict: From Hero in GW 2 to Zero in GW 3",
+      "order": 9
+    },
+    {
+      "manager_name": "Renny Muragu",
+      "team_name": "The Young Ones",
+      "rank_in_gw": 10,
+      "net_points": 37,
+      "badge": "🤡 10TH PLACE (WOODEN SPOON CLOWN)",
+      "roast_title": "Renny Muragu - 'The Young Ones' Inherit the Wooden Spoon (-4 Hit)",
+      "roast_body": "The ultimate disasterclass of Gameweek 3! Renny burned 4 transfer points only to stumble to a league-lowest 37 net points. Despite captaining Haaland (18 pts), the remaining 10 starting players generated a scandalous 23 gross points while 10 points were abandoned on the bench. A well-deserved winner of the GW 3 Wooden Spoon Clown Hat!",
+      "verdict": "Verdict: Undisputed Gameweek 3 Clown of the League",
+      "order": 10
+    }
+  ]
+}
