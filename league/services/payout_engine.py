@@ -119,11 +119,6 @@ def calculate_gameweek_payouts(gameweek: Gameweek) -> list:
         gameweek.payout_calculated = True
         gameweek.save(update_fields=['payout_calculated'])
 
-    # Automatically generate The FPL Boys Gazette newspaper issue for this gameweek
-    try:
-        from news.services.roast_engine import generate_roast_edition
-        generate_roast_edition(gameweek)
-    except Exception:
-        pass
-
+    # Note: Gameweek gazettes are NOT automatically published here.
+    # Gazettes are curated and published on demand with personalized analysis (picks, chips, captaincy, bench points).
     return all_updated

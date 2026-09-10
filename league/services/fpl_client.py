@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 FPL_BOOTSTRAP_URL = "https://fantasy.premierleague.com/api/bootstrap-static/"
 FPL_LEAGUE_STANDINGS_URL = "https://fantasy.premierleague.com/api/leagues-classic/{league_id}/standings/"
 FPL_ENTRY_HISTORY_URL = "https://fantasy.premierleague.com/api/entry/{entry_id}/history/"
+FPL_ENTRY_PICKS_URL = "https://fantasy.premierleague.com/api/entry/{entry_id}/event/{event_id}/picks/"
 FPL_EVENT_LIVE_URL = "https://fantasy.premierleague.com/api/event/{event_id}/live/"
 FPL_FIXTURES_EVENT_URL = "https://fantasy.premierleague.com/api/fixtures/?event={event_id}"
 
@@ -76,6 +77,28 @@ class FPLSyncService:
             return resp.json()
         except Exception as e:
             logger.error(f"Error fetching FPL history for entry {entry_id}: {e}")
+            return None
+
+    def fetch_entry_picks(self, entry_id, gw_num):
+        """Fetch tactical picks, captain, chips (TC, WC, BB, FH), and bench for a manager in a specific GW"""
+        url = FPL_ENTRY_PICKS_URL.format(entry_id=entry_id, event_id=gw_num)
+        try:
+            resp = requests.get(url, headers=HEADERS, timeout=self.timeout)
+            resp.raise_for_status()
+            return resp.json()
+        except Exception as e:
+            logger.error(f"Error fetching FPL picks for entry {entry_id} in GW {gw_num}: {e}")
+            return None
+
+    def fetch_event_live(self, gw_num):
+        """Fetch live player performance statistics and bonus for a specific gameweek"""
+        url = FPL_EVENT_LIVE_URL.format(event_id=gw_num)
+        try:
+            resp = requests.get(url, headers=HEADERS, timeout=self.timeout)
+            resp.raise_for_status()
+            return resp.json()
+        except Exception as e:
+            logger.error(f"Error fetching FPL event live stats for GW {gw_num}: {e}")
             return None
 
     def sync_gameweeks(self, bootstrap_data=None):
