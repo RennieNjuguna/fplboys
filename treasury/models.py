@@ -146,6 +146,10 @@ class Payment(models.Model):
         default=Decimal('0.00'),
         help_text="Late fine assessed (routed into BBQ Pot, typically Ksh. 50)"
     )
+    fine_paid = models.BooleanField(
+        default=False,
+        help_text="Whether the late fine (Ksh. 50) has been paid/settled by the member"
+    )
     notes = models.TextField(blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -172,25 +176,34 @@ class Payment(models.Model):
         return False
 
     @property
+    def is_fine_due(self) -> bool:
+        """True if this payment incurred a late fine that hasn't been paid yet"""
+        return bool(self.is_late and self.late_fine_amount > Decimal('0.00') and not self.fine_paid)
+
+    @property
     def total_due_target(self) -> Decimal:
-        """Standard gameweek contribution target (Ksh. 150.00)"""
-        return Decimal('150.00')
+        """Standard contribution (Ksh. 150) plus unpaid fine if late"""
+        extra = self.late_fine_amount if self.is_fine_due else Decimal('0.00')
+        return Decimal('150.00') + extra
 
     @property
     def balance_due(self) -> Decimal:
-        """Remaining unpaid contribution balance for this gameweek"""
-        return max(Decimal('0.00'), Decimal('150.00') - self.amount_paid)
+        """Remaining unpaid contribution and unpaid fine balance for this gameweek"""
+        unpaid_contrib = max(Decimal('0.00'), Decimal('150.00') - self.amount_paid)
+        unpaid_fine = self.late_fine_amount if self.is_fine_due else Decimal('0.00')
+        return unpaid_contrib + unpaid_fine
 
     @property
     def is_fully_cleared(self) -> bool:
-        """True if the member has paid the standard Ksh. 150 contribution in full"""
-        return self.amount_paid >= Decimal('150.00')
+        """True if the member has paid the contribution in full and cleared any late fines"""
+        return self.amount_paid >= Decimal('150.00') and (not self.is_late or self.fine_paid)
 
     def save(self, *args, **kwargs):
         # Auto-compute late status (waiver for GW1, GW2, GW19, GW38)
         if self.gameweek and self.gameweek.number in WAIVED_FINE_GAMEWEEKS:
             self.is_late = False
             self.late_fine_amount = Decimal('0.00')
+            self.fine_paid = True
         else:
             calculated_late = self.check_is_late()
             self.is_late = calculated_late
@@ -199,6 +212,7 @@ class Payment(models.Model):
                     self.late_fine_amount = Decimal('50.00')
             else:
                 self.late_fine_amount = Decimal('0.00')
+                self.fine_paid = False
 
         super().save(*args, **kwargs)
 

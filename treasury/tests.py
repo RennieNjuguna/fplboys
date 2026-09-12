@@ -947,21 +947,29 @@ class TreasuryFinancialTests(TestCase):
 
     def test_late_payment_150_keeps_50_fine_pending_and_ineligible_for_podium(self):
         """
-        Tests the simple game logic:
-        1. Member pays Ksh. 150 late for a non-waived GW (e.g. GW3).
-        2. Contribution is Ksh. 150 (amount_paid=150.00).
-        3. Payment is recorded as is_late=True, late_fine_amount=50.00.
-        4. Member is disqualified from podium prize winnings in payout engine for that GW.
-        5. In Ledger Matrix, cell status is LATE with 150 amount and +50 fine.
-        6. In Active Radar, member is Cleared & Paid for the 150 contribution with label 'Paid (Late + 50 Fine)'.
+        Tests the 3-step late payment fine and radar lifecycle:
+        1. Member pays Ksh. 150 late for a non-waived GW (GW3):
+           - In Flagged: Yes (Reason: Late Payment, Ksh. 50 fine due).
+           - In Pending: Yes (Ksh. 50 fine due).
+           - In Cleared & Paid: No.
+           - Ineligible for podium cash prizes.
+        2. Member pays the Ksh. 50 fine:
+           - In Flagged: Yes (Reason: Late Payment, Fine Paid).
+           - In Pending: No.
+           - In Cleared & Paid: Yes ('Paid (Late + 50 Fine)').
+        3. GW3 finishes, GW4 starts:
+           - In Flagged: No (GW3 fine was paid).
+           - In Pending: Yes for GW4 (standard Ksh. 150 contribution).
         """
         from treasury.services.payment_allocation import allocate_payment_with_rollover
         from treasury.services.ledger_matrix import get_active_gw_flagged_summary, build_financial_ledger_matrix
         from league.services.payout_engine import is_member_eligible_for_prize
 
         # Setup prior GW1 and GW2 as fully paid on-time
-        Payment.objects.create(member=self.m1, gameweek=self.gw1, amount_paid=Decimal('150.00'), verified=True)
-        Payment.objects.create(member=self.m1, gameweek=self.gw2, amount_paid=Decimal('150.00'), verified=True)
+        Payment.objects.create(member=self.m1, gameweek=self.gw1, amount_paid=Decimal('150.00'), is_late=False, late_fine_amount=Decimal('0.00'), fine_paid=True, verified=True)
+        Payment.objects.create(member=self.m1, gameweek=self.gw2, amount_paid=Decimal('150.00'), is_late=False, late_fine_amount=Decimal('0.00'), fine_paid=True, verified=True)
+
+        gw4 = Gameweek.objects.create(number=4, name="Gameweek 4", deadline_time=timezone.now() + timedelta(days=7), status='upcoming')
 
         # 1. Member 1 pays 150 late for GW3 (kickoff passed)
         post_kickoff = self.gw3.start_time + timedelta(hours=2)
@@ -977,25 +985,58 @@ class TreasuryFinancialTests(TestCase):
         p = Payment.objects.get(member=self.m1, gameweek=self.gw3)
         self.assertTrue(p.is_late)
         self.assertEqual(p.late_fine_amount, Decimal('50.00'))
+        self.assertFalse(p.fine_paid)
         self.assertEqual(p.amount_paid, Decimal('150.00'))
-        self.assertEqual(p.balance_due, Decimal('0.00'))
+        self.assertEqual(p.balance_due, Decimal('50.00'))
 
-        # 2. Check prize eligibility: Ineligible for GW3 podium
+        # Check prize eligibility: Ineligible for GW3 podium
         self.assertFalse(is_member_eligible_for_prize(self.m1, self.gw3))
 
-        # 3. Check Active Radar: Member is cleared with 'Paid (Late + 50 Fine)' label
-        summary = get_active_gw_flagged_summary(target_gw_num=3)
-        cleared_m1 = next((c for c in summary['current_gw_cleared'] if c['member'] == self.m1), None)
-        self.assertIsNotNone(cleared_m1)
-        self.assertEqual(cleared_m1['status_label'], 'Paid (Late + 50 Fine)')
+        # Check Active Radar Step 1:
+        summary1 = get_active_gw_flagged_summary(target_gw_num=3)
+        flagged1 = next((d for d in summary1['flagged_defaulters'] if d['member'] == self.m1), None)
+        pending1 = next((p for p in summary1['current_gw_pending'] if p['member'] == self.m1), None)
+        cleared1 = next((c for c in summary1['current_gw_cleared'] if c['member'] == self.m1), None)
 
-        # 4. Check Ledger Matrix: Status is LATE with 150 paid and 50 fine
-        matrix = build_financial_ledger_matrix()
-        m1_row = next(r for r in matrix['rows'] if r['member'] == self.m1)
-        gw3_cell = next(c for c in m1_row['cells'] if c['gw_number'] == 3)
-        self.assertEqual(gw3_cell['status'], 'LATE')
-        self.assertEqual(gw3_cell['amount_paid'], Decimal('150.00'))
-        self.assertEqual(gw3_cell['late_fine'], Decimal('50.00'))
+        self.assertIsNotNone(flagged1)
+        self.assertEqual(flagged1['total_due'], Decimal('50.00'))
+        self.assertIsNotNone(pending1)
+        self.assertEqual(pending1['balance_due'], Decimal('50.00'))
+        self.assertTrue(pending1['is_fine_only'])
+        self.assertIsNone(cleared1)
+
+        # 2. Member pays the Ksh. 50 fine
+        allocate_payment_with_rollover(
+            member=self.m1,
+            start_gw=self.gw3,
+            total_amount=Decimal('50.00'),
+            verified=True
+        )
+        p.refresh_from_db()
+        self.assertTrue(p.fine_paid)
+
+        # Check Active Radar Step 2:
+        summary2 = get_active_gw_flagged_summary(target_gw_num=3)
+        flagged2 = next((d for d in summary2['flagged_defaulters'] if d['member'] == self.m1), None)
+        pending2 = next((p for p in summary2['current_gw_pending'] if p['member'] == self.m1), None)
+        cleared2 = next((c for c in summary2['current_gw_cleared'] if c['member'] == self.m1), None)
+
+        self.assertIsNotNone(flagged2)
+        self.assertEqual(flagged2['total_due'], Decimal('0.00'))
+        self.assertIsNone(pending2)
+        self.assertIsNotNone(cleared2)
+        self.assertEqual(cleared2['status_label'], 'Paid (Late + 50 Fine)')
+
+        # 3. GW3 finishes, GW4 starts
+        self.gw3.status = 'finished'
+        self.gw3.save()
+        summary3 = get_active_gw_flagged_summary(target_gw_num=4)
+        flagged3 = next((d for d in summary3['flagged_defaulters'] if d['member'] == self.m1), None)
+        pending3 = next((p for p in summary3['current_gw_pending'] if p['member'] == self.m1), None)
+
+        self.assertIsNone(flagged3)
+        self.assertIsNotNone(pending3)
+        self.assertEqual(pending3['balance_due'], Decimal('150.00'))
 
 
 

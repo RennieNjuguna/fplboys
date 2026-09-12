@@ -149,11 +149,13 @@
                         </div>
 
                         <div class="text-right flex-shrink-0">
-                            <span class="px-2 py-0.5 rounded-lg bg-rose-950 border border-rose-700 text-rose-300 font-bold font-mono text-[11px] block">
+                            <span class="px-2 py-0.5 rounded-lg {% if item.total_due > 0 %}bg-rose-950 border border-rose-700 text-rose-300{% else %}bg-amber-950/60 border border-amber-700/60 text-amber-300{% endif %} font-bold font-mono text-[11px] block">
                                 Ksh. {{ item.total_due|floatformat:0 }}
                             </span>
                             <span class="text-[9px] text-rose-400 block mt-0.5 font-medium">
-                                {% if item.has_fines %}
+                                {% if item.total_due == 0 and item.has_late_payment %}
+                                <span class="text-amber-400">Late Payment (Fine Paid)</span>
+                                {% elif item.has_fines %}
                                 Bal: {{ item.total_balance_due|floatformat:0 }} + {{ item.total_fines|floatformat:0 }} fine
                                 {% else %}
                                 Fee: {{ item.total_balance_due|floatformat:0 }} (0 fine)
@@ -212,7 +214,7 @@
                                 Ksh. {{ item.balance_due|floatformat:0 }}
                             </span>
                             <span class="text-[9px] {% if flagged_summary.is_within_24h %}text-amber-400{% else %}text-gray-500{% endif %} block mt-0.5">
-                                {% if item.is_fine_only %}<span class="text-rose-400 font-bold">Fine Unpaid (Bal Ksh. {{ item.balance_due|floatformat:0 }})</span>{% elif item.is_partial %}Partial (Paid Ksh. {{ item.amount_paid|floatformat:0 }} • Bal Ksh. {{ item.balance_due|floatformat:0 }}){% elif flagged_summary.is_within_24h %}💣 At Risk{% else %}Pending{% endif %}
+                                {% if item.is_fine_only %}<span class="text-rose-400 font-bold">Late Payment (Bal Ksh. {{ item.balance_due|floatformat:0 }} Fine Due)</span>{% elif item.is_partial %}Partial (Paid Ksh. {{ item.amount_paid|floatformat:0 }} • Bal Ksh. {{ item.balance_due|floatformat:0 }}){% elif flagged_summary.is_within_24h %}💣 At Risk{% else %}Pending{% endif %}
                             </span>
                         </div>
                     </div>

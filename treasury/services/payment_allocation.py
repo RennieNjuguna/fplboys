@@ -117,6 +117,22 @@ def allocate_payment_with_rollover(
                 verified=verified
             )
 
+        # First check and settle any unpaid late fines if funds are provided
+        unpaid_fine_payments = Payment.objects.filter(
+            member=member,
+            is_late=True,
+            fine_paid=False
+        ).order_by('gameweek__number')
+
+        for fine_p in unpaid_fine_payments:
+            fine_due = fine_p.late_fine_amount or Decimal('50.00')
+            if remaining_balance >= fine_due:
+                fine_p.fine_paid = True
+                fine_p.save(update_fields=['fine_paid'])
+                remaining_balance -= fine_due
+                if fine_p not in created_payments:
+                    created_payments.append(fine_p)
+
         first_allocated_gw = None
         for gw in candidate_gws:
             if remaining_balance <= Decimal('0.00'):
@@ -127,6 +143,14 @@ def allocate_payment_with_rollover(
 
             standard_rate = Decimal('150.00')
             if current_paid >= standard_rate:
+                if existing_payment and existing_payment.is_late and not existing_payment.fine_paid:
+                    fine_due = existing_payment.late_fine_amount or Decimal('50.00')
+                    if remaining_balance >= fine_due:
+                        existing_payment.fine_paid = True
+                        existing_payment.save(update_fields=['fine_paid'])
+                        remaining_balance -= fine_due
+                        if existing_payment not in created_payments:
+                            created_payments.append(existing_payment)
                 continue  # Already fully paid, rollover to next GW
 
             needed = standard_rate - current_paid
