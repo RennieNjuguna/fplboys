@@ -1038,6 +1038,50 @@ class TreasuryFinancialTests(TestCase):
         self.assertIsNotNone(pending3)
         self.assertEqual(pending3['balance_due'], Decimal('150.00'))
 
+    def test_active_gameweek_does_not_distribute_prizes(self):
+        """Active or upcoming gameweeks must NEVER distribute cash prizes or mark payouts calculated"""
+        from league.services.payout_engine import calculate_gameweek_payouts
+        gw_active = Gameweek.objects.create(number=10, name="GW 10", status='active', deadline_time=self.deadline)
+        r1 = GameweekResult.objects.create(member=self.m1, gameweek=gw_active, gw_points=80, transfer_cost=0, net_points=80)
+        r2 = GameweekResult.objects.create(member=self.m2, gameweek=gw_active, gw_points=75, transfer_cost=0, net_points=75)
+
+        calculate_gameweek_payouts(gw_active)
+
+        r1.refresh_from_db()
+        r2.refresh_from_db()
+        gw_active.refresh_from_db()
+
+        self.assertEqual(r1.gw_prize_won, Decimal('0.00'))
+        self.assertFalse(r1.is_top3)
+        self.assertEqual(r2.gw_prize_won, Decimal('0.00'))
+        self.assertFalse(r2.is_top3)
+        self.assertFalse(gw_active.payout_calculated)
+
+    def test_prize_balance_disbursed_vs_available(self):
+        """When prizes are disbursed via M-Pesa, available balance reduces to 0"""
+        from treasury.models import PrizePayout
+        from treasury.services.payment_allocation import get_member_available_prize_balance
+
+        gw_fin = Gameweek.objects.create(number=11, name="GW 11", status='finished', deadline_time=self.deadline)
+        GameweekResult.objects.create(member=self.m1, gameweek=gw_fin, gw_points=90, net_points=90, gw_prize_won=Decimal('250.00'), is_top3=True)
+        GameweekResult.objects.create(member=self.m2, gameweek=gw_fin, gw_points=80, net_points=80, gw_prize_won=Decimal('83.33'), is_top3=True)
+
+        self.assertEqual(get_member_available_prize_balance(self.m1), Decimal('250.00'))
+        self.assertEqual(get_member_available_prize_balance(self.m2), Decimal('83.33'))
+
+        # Disburse m1's prize
+        PrizePayout.objects.create(
+            member=self.m1,
+            gameweek=gw_fin,
+            amount=Decimal('250.00'),
+            payout_method='MPESA_CASH',
+            mpesa_reference='TEST-DISBURSE-1'
+        )
+
+        self.assertEqual(get_member_available_prize_balance(self.m1), Decimal('0.00'))
+        self.assertEqual(get_member_available_prize_balance(self.m2), Decimal('83.33'))
+
+
 
 
 

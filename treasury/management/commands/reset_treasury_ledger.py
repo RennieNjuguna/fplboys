@@ -138,6 +138,65 @@ class Command(BaseCommand):
             for gw in Gameweek.objects.filter(status='finished').order_by('number'):
                 calculate_gameweek_payouts(gw)
 
+            # Ensure historical GW3 official podium winners are preserved:
+            # 1st: Torque Dennis (250.00), 2nd: Aron Mangati (166.67), 3rd: Marvin Owino (83.33)
+            gw3 = Gameweek.objects.filter(number=3).first()
+            if gw3:
+                for res in gw3.results.all():
+                    name_lower = res.member.manager_name.lower()
+                    if "dennis" in name_lower:
+                        res.gw_prize_won = Decimal('250.00')
+                        res.is_top3 = True
+                        res.league_rank = 1
+                    elif "aron" in name_lower:
+                        res.gw_prize_won = Decimal('166.67')
+                        res.is_top3 = True
+                        res.league_rank = 2
+                    elif "owino" in name_lower or "marvin" in name_lower:
+                        res.gw_prize_won = Decimal('83.33')
+                        res.is_top3 = True
+                        res.league_rank = 3
+                    else:
+                        res.gw_prize_won = Decimal('0.00')
+                        res.is_top3 = False
+                    res.save(update_fields=['gw_prize_won', 'is_top3', 'league_rank'])
+                gw3.payout_calculated = True
+                gw3.save(update_fields=['payout_calculated'])
+
+            # 6. Seed historical prize cash payouts (disbursed prior to GW4)
+            # GW1 Winners: Marve Mathingu (250.00), Samuel Wambua (166.67), Renny Muragu (83.33)
+            # GW2 Winners: Benn Mwangi (250.00), Renny Muragu (166.67), Bright Ottore (83.33)
+            # GW3 Winners: Torque Dennis (250.00), Aron Mangati (166.67) - disbursed; Marvin Owino (83.33) is pending/available.
+            historical_disbursements = [
+                # GW1
+                {'manager_name': 'Marve Mathingu', 'gw_num': 1, 'amount': Decimal('250.00'), 'dt': eat_tz.localize(datetime(2026, 8, 20, 12, 0)), 'ref': 'MPESA-PAYOUT-GW1-MM'},
+                {'manager_name': 'Samuel Wambua', 'gw_num': 1, 'amount': Decimal('166.67'), 'dt': eat_tz.localize(datetime(2026, 8, 20, 12, 5)), 'ref': 'MPESA-PAYOUT-GW1-SW'},
+                {'manager_name': 'Renny Muragu', 'gw_num': 1, 'amount': Decimal('83.33'), 'dt': eat_tz.localize(datetime(2026, 8, 20, 12, 10)), 'ref': 'MPESA-PAYOUT-GW1-RM'},
+                # GW2
+                {'manager_name': 'Benn Mwangi', 'gw_num': 2, 'amount': Decimal('250.00'), 'dt': eat_tz.localize(datetime(2026, 8, 27, 12, 0)), 'ref': 'MPESA-PAYOUT-GW2-BM'},
+                {'manager_name': 'Renny Muragu', 'gw_num': 2, 'amount': Decimal('166.67'), 'dt': eat_tz.localize(datetime(2026, 8, 27, 12, 5)), 'ref': 'MPESA-PAYOUT-GW2-RM'},
+                {'manager_name': 'Bright Ottore', 'gw_num': 2, 'amount': Decimal('83.33'), 'dt': eat_tz.localize(datetime(2026, 8, 27, 12, 10)), 'ref': 'MPESA-PAYOUT-GW2-BO'},
+                # GW3
+                {'manager_name': 'Torque Dennis', 'gw_num': 3, 'amount': Decimal('250.00'), 'dt': eat_tz.localize(datetime(2026, 9, 3, 12, 0)), 'ref': 'MPESA-PAYOUT-GW3-TD'},
+                {'manager_name': 'Aron Mangati', 'gw_num': 3, 'amount': Decimal('166.67'), 'dt': eat_tz.localize(datetime(2026, 9, 3, 12, 5)), 'ref': 'MPESA-PAYOUT-GW3-AM'},
+            ]
+
+            for item in historical_disbursements:
+                m = members_by_name.get(item['manager_name'].lower())
+                if not m:
+                    m = Member.objects.filter(manager_name__icontains=item['manager_name'].split()[0]).first()
+                gw = Gameweek.objects.filter(number=item['gw_num']).first()
+                if m and gw:
+                    PrizePayout.objects.create(
+                        member=m,
+                        gameweek=gw,
+                        amount=item['amount'],
+                        payout_method='MPESA_CASH',
+                        mpesa_reference=item['ref'],
+                        notes=f"Historical GW {gw.number} cash payout sent via M-Pesa",
+                        disbursed_at=item['dt']
+                    )
+
         self.stdout.write("\n" + "="*50)
         self.stdout.write(self.style.SUCCESS("[DONE] Treasury Ledger reset & initial payments successfully seeded!"))
         self.stdout.write("="*50 + "\n")

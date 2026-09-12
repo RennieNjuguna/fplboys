@@ -41,8 +41,8 @@ class Member(models.Model):
 
     @property
     def total_prizes_won(self):
-        # Sum of GW prizes won
-        total = self.gw_results.aggregate(
+        # Sum of GW prizes won from finished gameweeks only
+        total = self.gw_results.filter(gameweek__status='finished').aggregate(
             models.Sum('gw_prize_won')
         )['gw_prize_won__sum']
         return Decimal(str(total or 0.00))

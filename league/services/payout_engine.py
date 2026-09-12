@@ -77,6 +77,17 @@ def calculate_gameweek_payouts(gameweek: Gameweek) -> list:
                 item.last_rank = prev_ranks[item.member_id]
         current_rank += len(tied_group)
 
+    if gameweek.status != 'finished':
+        # Prize payouts must NEVER be distributed for active/upcoming gameweeks
+        with transaction.atomic():
+            for res in results:
+                res.gw_prize_won = Decimal('0.00')
+                res.is_top3 = False
+                res.save(update_fields=['league_rank', 'last_rank', 'gw_prize_won', 'is_top3', 'net_points'])
+            gameweek.payout_calculated = False
+            gameweek.save(update_fields=['payout_calculated'])
+        return results
+
     # Separate eligible and ineligible managers for prize distribution
     eligible_grouped = []
     ineligible_members = []
