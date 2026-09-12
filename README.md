@@ -1,6 +1,17 @@
 # ⚽ FPL Boys - Mini-League & Financial Ledger Web Application
 
-A complete, production-ready Django web application with an SQLite database backend designed to manage a 10-member Fantasy Premier League (FPL) mini-league (**League ID: 1868934**) and its financial ledger.
+> [!IMPORTANT]
+> ## 🚨 CRITICAL AGENT & ARCHITECTURE INSTRUCTIONS (READ FIRST)
+> 
+> 1. **THE ONLINE PRODUCTION SERVER IS THE SOLE SOURCE OF TRUTH**:
+>    - All real financial data, M-Pesa payments, prize disbursements, rollovers, fines, and transaction history are entered and managed **ONLY on the online server and live database**.
+>    - The user **NEVER** updates or uses the local database for actual accounting.
+> 
+> 2. **THIS LOCAL REPOSITORY IS STRICTLY FOR CODE & LOGIC DEVELOPMENT**:
+>    - This workspace is used **ONLY** for developing code, modifying functions/logic, designing UI/templates, and running automated tests.
+>    - **NEVER** assume the local SQLite database reflects actual league financial state or history.
+>    - **NEVER** write or run scripts that attempt to reset, overwrite, or hardcode live financial records assuming local DB is production.
+>    - All work done here must be committed and pushed to Git (`origin/main`) so the user can safely deploy logic updates to the online server without affecting live data.
 
 ---
 

@@ -1,5 +1,15 @@
 #!/usr/bin/env python
-"""Django's command-line utility for administrative tasks."""
+"""
+Django's command-line utility for administrative tasks.
+
+================================================================================
+🚨 CRITICAL AGENT & ARCHITECTURE NOTICE:
+1. The ONLINE server and live database are the SOLE source of truth.
+2. The user NEVER updates or manages real financial data on this local database.
+3. This local workspace is strictly for writing code, fixing logic, building UI,
+   and running automated test suites before pushing to Git.
+================================================================================
+"""
 import os
 import sys
 
