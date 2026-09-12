@@ -125,20 +125,11 @@ def allocate_payment_with_rollover(
             existing_payment = Payment.objects.filter(member=member, gameweek=gw).first()
             current_paid = existing_payment.amount_paid if existing_payment else Decimal('0.00')
 
-            gw_waived = gw.number in WAIVED_FINE_GAMEWEEKS
-            is_gw_late = False
-            if not gw_waived:
-                if existing_payment and existing_payment.is_late:
-                    is_gw_late = True
-                elif gw.start_time and timestamp and timestamp > gw.start_time:
-                    is_gw_late = True
-
-            required_rate = Decimal('200.00') if is_gw_late else Decimal('150.00')
-
-            if current_paid >= required_rate:
+            standard_rate = Decimal('150.00')
+            if current_paid >= standard_rate:
                 continue  # Already fully paid, rollover to next GW
 
-            needed = required_rate - current_paid
+            needed = standard_rate - current_paid
             allocating = min(remaining_balance, needed)
             if allocating <= Decimal('0.00'):
                 continue
@@ -153,8 +144,8 @@ def allocate_payment_with_rollover(
 
             if existing_payment:
                 existing_payment.amount_paid += allocating
-                if existing_payment.amount_paid > required_rate:
-                    existing_payment.amount_paid = required_rate
+                if existing_payment.amount_paid > standard_rate:
+                    existing_payment.amount_paid = standard_rate
 
                 if timestamp:
                     existing_payment.timestamp_received = timestamp

@@ -173,21 +173,18 @@ class Payment(models.Model):
 
     @property
     def total_due_target(self) -> Decimal:
-        """Total required to clear this gameweek (Ksh. 200 if late on non-waived GW, Ksh. 150 otherwise)"""
-        is_waived = bool(self.gameweek and self.gameweek.number in WAIVED_FINE_GAMEWEEKS)
-        if self.is_late and not is_waived:
-            return Decimal('200.00')
+        """Standard gameweek contribution target (Ksh. 150.00)"""
         return Decimal('150.00')
 
     @property
     def balance_due(self) -> Decimal:
-        """Remaining unpaid balance for this gameweek (including any unpaid late fines)"""
-        return max(Decimal('0.00'), self.total_due_target - self.amount_paid)
+        """Remaining unpaid contribution balance for this gameweek"""
+        return max(Decimal('0.00'), Decimal('150.00') - self.amount_paid)
 
     @property
     def is_fully_cleared(self) -> bool:
-        """True if the member has paid both the standard fee and any applicable late fines in full"""
-        return self.amount_paid >= self.total_due_target
+        """True if the member has paid the standard Ksh. 150 contribution in full"""
+        return self.amount_paid >= Decimal('150.00')
 
     def save(self, *args, **kwargs):
         # Auto-compute late status (waiver for GW1, GW2, GW19, GW38)

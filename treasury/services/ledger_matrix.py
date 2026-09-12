@@ -64,21 +64,21 @@ def build_financial_ledger_matrix(max_gws=38):
                 if is_late_payment and late_fine == Decimal('0.00'):
                     late_fine = Decimal('50.00')
 
-                total_target = standard_due + late_fine
-                balance_due = max(Decimal('0.00'), total_target - amount_paid)
+                balance_due = max(Decimal('0.00'), standard_due - amount_paid)
                 
-                if is_late_payment:
-                    if balance_due == Decimal('0.00'):
+                if amount_paid >= standard_due:
+                    if is_late_payment:
                         status = 'LATE'
+                        row_late_count += 1
+                        col_totals[gw.id]['late_count'] += 1
                     else:
-                        status = 'PARTIAL'
-                    row_late_count += 1
-                    col_totals[gw.id]['late_count'] += 1
-                elif amount_paid < total_target:
-                    status = 'PARTIAL'
+                        status = 'PAID'
+                        col_totals[gw.id]['paid_count'] += 1
                 else:
-                    status = 'PAID'
-                    col_totals[gw.id]['paid_count'] += 1
+                    status = 'PARTIAL'
+                    if is_late_payment:
+                        row_late_count += 1
+                        col_totals[gw.id]['late_count'] += 1
 
                 row_total_paid += amount_paid
                 row_total_fines += late_fine
@@ -258,22 +258,17 @@ def get_active_gw_flagged_summary(target_gw_num=None, target_gw_number=None) -> 
             gw_waived = gw.number in WAIVED_FINE_GAMEWEEKS
             standard_fee = Decimal('150.00')
 
-            is_late_gw = (not gw_waived) and ((payment.is_late if payment else True))
-            fine = Decimal('50.00') if is_late_gw else Decimal('0.00')
-            total_target = standard_fee + fine
-            bal = max(Decimal('0.00'), total_target - paid)
-
-            if bal > Decimal('0.00'):
+            if paid < standard_fee:
+                fine = Decimal('50.00') if not gw_waived else Decimal('0.00')
+                bal = (standard_fee - paid) + fine
                 member_balance_sum += bal
                 member_fines_sum += fine
-                is_fine_unpaid = (paid >= standard_fee and fine > Decimal('0.00'))
                 member_defaults.append({
                     'gw_number': gw.number,
                     'amount_paid': paid,
                     'balance_due': bal,
                     'late_fine': fine,
                     'is_waived': gw_waived,
-                    'is_fine_unpaid': is_fine_unpaid,
                     'total_due': bal
                 })
 
@@ -281,9 +276,7 @@ def get_active_gw_flagged_summary(target_gw_num=None, target_gw_number=None) -> 
             gw_summary_parts = []
             for d in member_defaults:
                 fine_note = " (Waived Fine)" if d['is_waived'] else (" (+50 Fine)" if d['late_fine'] > 0 else "")
-                if d.get('is_fine_unpaid'):
-                    gw_summary_parts.append(f"GW {d['gw_number']} (Bal Ksh. {d['balance_due']:,.0f} Fine Due)")
-                elif d['amount_paid'] > Decimal('0.00'):
+                if d['amount_paid'] > Decimal('0.00'):
                     gw_summary_parts.append(f"GW {d['gw_number']} (Bal Ksh. {d['balance_due']:,.0f}{fine_note})")
                 else:
                     gw_summary_parts.append(f"GW {d['gw_number']} (Ksh. {d['balance_due']:,.0f}{fine_note})")
@@ -326,11 +319,9 @@ def get_active_gw_flagged_summary(target_gw_num=None, target_gw_number=None) -> 
         total_collected_gw += paid
 
         standard_fee = Decimal('150.00')
-        is_target_late = (not is_waived) and ((payment.is_late if payment else False) or (is_past_start and paid < standard_fee))
-        fine = Decimal('50.00') if is_target_late else Decimal('0.00')
-        total_target = standard_fee + fine
+        is_target_late = bool(payment and payment.is_late and not is_waived)
 
-        if paid >= total_target:
+        if paid >= standard_fee:
             is_advance = 'Carryover' in (payment.mpesa_code or '') or 'PRIZE' in (payment.mpesa_code or '')
             status_lbl = 'Paid (Advance)' if is_advance else ('Paid (Late + 50 Fine)' if is_target_late else 'Paid (On Time)')
             current_gw_cleared.append({
@@ -344,27 +335,27 @@ def get_active_gw_flagged_summary(target_gw_num=None, target_gw_number=None) -> 
                 'status_label': status_lbl,
             })
         elif paid > Decimal('0.00'):
-            # Partial payment (e.g. paid 100 or paid 150 of 200) - strictly in pending with remaining balance due
-            bal = total_target - paid
+            bal = standard_fee - paid
             current_gw_pending.append({
                 'member': member,
                 'amount_paid': paid,
                 'balance_due': bal,
-                'potential_fine': fine,
+                'potential_fine': Decimal('50.00') if (is_past_start and not is_waived) else Decimal('0.00'),
                 'total_due': bal,
                 'is_partial': True,
-                'is_fine_only': (paid >= standard_fee and fine > Decimal('0.00')),
+                'is_fine_only': False,
                 'phone_number': member.phone_number,
                 'payment': payment,
             })
         else:
-            bal = total_target
+            bal = standard_fee
+            fine = Decimal('50.00') if (is_past_start and not is_waived) else Decimal('0.00')
             current_gw_pending.append({
                 'member': member,
                 'amount_paid': Decimal('0.00'),
                 'balance_due': bal,
                 'potential_fine': fine,
-                'total_due': bal,
+                'total_due': bal + fine,
                 'is_partial': False,
                 'is_fine_only': False,
                 'phone_number': member.phone_number,
