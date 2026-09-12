@@ -283,6 +283,10 @@ class TreasuryFinancialTests(TestCase):
         Payment.objects.create(member=self.m1, gameweek=self.gw1, amount_paid=Decimal('150.00'), verified=True)
         Payment.objects.create(member=self.m1, gameweek=self.gw2, amount_paid=Decimal('150.00'), verified=True)
 
+        self.gw3.status = 'upcoming'
+        self.gw3.deadline_time = timezone.now() + timedelta(days=3)
+        self.gw3.save()
+
         gw4 = Gameweek.objects.create(number=4, name="Gameweek 4", deadline_time=self.deadline + timedelta(days=7), status='upcoming')
         gw5 = Gameweek.objects.create(number=5, name="Gameweek 5", deadline_time=self.deadline + timedelta(days=14), status='upcoming')
 
@@ -529,6 +533,10 @@ class TreasuryFinancialTests(TestCase):
         """
         Paying Ksh. 500 across empty GWs caps each GW at 150 and rolls over excess.
         """
+        self.gw3.status = 'upcoming'
+        self.gw3.deadline_time = timezone.now() + timedelta(days=3)
+        self.gw3.save()
+
         gw4 = Gameweek.objects.create(number=4, name="Gameweek 4", deadline_time=self.deadline + timedelta(days=7), status='upcoming')
         self.client.post('/treasury/unlock/', {'password': '@FPLBoyz254??', 'next': '/treasury/portal/'})
 
@@ -936,6 +944,83 @@ class TreasuryFinancialTests(TestCase):
         self.assertEqual(col_gw1['total_fines'], Decimal('0.00'))
         self.assertEqual(col_gw2['total_fines'], Decimal('0.00'))
         self.assertEqual(col_gw3['total_fines'], Decimal('50.00'))
+
+    def test_late_payment_150_keeps_50_fine_pending_and_ineligible_for_podium(self):
+        """
+        Tests the exact scenario:
+        1. Member pays Ksh. 150 late for a non-waived GW (e.g. GW3).
+        2. Payment is recorded as is_late=True, late_fine_amount=50.00.
+        3. Member owes total Ksh. 200 (150 fee + 50 fine) -> has balance_due of Ksh. 50.
+        4. Member is NOT in 'current_gw_cleared'.
+        5. Member IS in 'current_gw_pending' or 'flagged_defaulters' with balance_due=50.
+        6. Member is disqualified from podium prize winnings in payout engine for that GW.
+        7. When member pays remaining Ksh. 50, amount_paid becomes 200.00, balance_due becomes 0.00, and they move to cleared.
+        """
+        from treasury.services.payment_allocation import allocate_payment_with_rollover
+        from treasury.services.ledger_matrix import get_active_gw_flagged_summary
+        from league.services.payout_engine import is_member_eligible_for_prize
+
+        # Setup prior GW1 and GW2 as fully paid on-time
+        Payment.objects.create(member=self.m1, gameweek=self.gw1, amount_paid=Decimal('150.00'), verified=True)
+        Payment.objects.create(member=self.m1, gameweek=self.gw2, amount_paid=Decimal('150.00'), verified=True)
+
+        # 1. Member 1 pays 150 late for GW3 (kickoff passed)
+        post_kickoff = self.gw3.start_time + timedelta(hours=2)
+        allocate_payment_with_rollover(
+            member=self.m1,
+            start_gw=self.gw3,
+            total_amount=Decimal('150.00'),
+            timestamp=post_kickoff,
+            mpesa_code="LATE150",
+            verified=True
+        )
+
+        p = Payment.objects.get(member=self.m1, gameweek=self.gw3)
+        self.assertTrue(p.is_late)
+        self.assertEqual(p.late_fine_amount, Decimal('50.00'))
+        self.assertEqual(p.amount_paid, Decimal('150.00'))
+        self.assertEqual(p.total_due_target, Decimal('200.00'))
+        self.assertEqual(p.balance_due, Decimal('50.00'))
+        self.assertFalse(p.is_fully_cleared)
+
+        # 2. Check prize eligibility: Ineligible for GW3 podium
+        self.assertFalse(is_member_eligible_for_prize(self.m1, self.gw3))
+
+        # 3. Check Active Radar: Member is in pending/defaulters for 50, NOT in cleared
+        summary = get_active_gw_flagged_summary(target_gw_num=3)
+        cleared_members = [c['member'] for c in summary['current_gw_cleared']]
+        self.assertNotIn(self.m1, cleared_members)
+
+        # Pending or defaulter contains m1 with balance_due = 50
+        pending_m1 = next((p for p in summary['current_gw_pending'] if p['member'] == self.m1), None)
+        defaulter_m1 = next((d for d in summary['flagged_defaulters'] if d['member'] == self.m1), None)
+        self.assertTrue(pending_m1 is not None or defaulter_m1 is not None)
+        if pending_m1:
+            self.assertEqual(pending_m1['balance_due'], Decimal('50.00'))
+        if defaulter_m1:
+            self.assertEqual(defaulter_m1['total_due'], Decimal('50.00'))
+
+        # 4. Member pays remaining Ksh. 50 fine
+        allocate_payment_with_rollover(
+            member=self.m1,
+            start_gw=self.gw3,
+            total_amount=Decimal('50.00'),
+            timestamp=post_kickoff + timedelta(hours=1),
+            mpesa_code="FINE50",
+            verified=True
+        )
+
+        p.refresh_from_db()
+        self.assertEqual(p.amount_paid, Decimal('200.00'))
+        self.assertEqual(p.balance_due, Decimal('0.00'))
+        self.assertTrue(p.is_fully_cleared)
+
+        # Now cleared
+        summary2 = get_active_gw_flagged_summary(target_gw_num=3)
+        cleared_members2 = [c['member'] for c in summary2['current_gw_cleared']]
+        self.assertIn(self.m1, cleared_members2)
+        # Still ineligible for prize podium due to late payment
+        self.assertFalse(is_member_eligible_for_prize(self.m1, self.gw3))
 
 
 

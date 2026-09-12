@@ -512,12 +512,15 @@ def api_check_deadline(request):
             gw = None
 
     if not gw and member:
-        # Auto-detect earliest unpaid / partial gameweek for member
+        # Auto-detect earliest unpaid / partial gameweek for member (accounting for late fines)
         joined_gw = getattr(member, 'joined_gameweek', 1)
         for g in Gameweek.objects.filter(number__gte=joined_gw).order_by('number'):
             p = Payment.objects.filter(member=member, gameweek=g, verified=True).first()
             paid = p.amount_paid if p else Decimal('0.00')
-            if paid < standard_due:
+            gw_waived = g.number in WAIVED_FINE_GAMEWEEKS
+            is_gw_late = (not gw_waived) and ((p.is_late if p else False) or (g.start_time and (ts or timezone.now()) > g.start_time))
+            req = Decimal('200.00') if is_gw_late else Decimal('150.00')
+            if paid < req:
                 gw = g
                 break
         if not gw:
@@ -530,21 +533,25 @@ def api_check_deadline(request):
         return JsonResponse({'error': 'No gameweek available'}, status=400)
 
     is_waived = gw.number in WAIVED_FINE_GAMEWEEKS
-    is_late = False
-    if gw.start_time and ts and not is_waived:
-        is_late = ts > gw.start_time
-
-    late_fine = Decimal('50.00') if is_late else Decimal('0.00')
-
     existing_paid = Decimal('0.00')
     has_existing = False
+    existing_p = None
     if member:
         existing_p = Payment.objects.filter(member=member, gameweek=gw).first()
         if existing_p:
             existing_paid = existing_p.amount_paid
             has_existing = True
 
-    balance_due = max(Decimal('0.00'), standard_due - existing_paid)
+    is_late = False
+    if not is_waived:
+        if has_existing and existing_p.is_late:
+            is_late = True
+        elif gw.start_time and ts and ts > gw.start_time:
+            is_late = True
+
+    late_fine = Decimal('50.00') if is_late else Decimal('0.00')
+    total_target = standard_due + late_fine
+    balance_due = max(Decimal('0.00'), total_target - existing_paid)
 
     # Recommended amount
     if has_existing and balance_due > Decimal('0.00'):
@@ -557,11 +564,16 @@ def api_check_deadline(request):
     eat_tz = pytz.timezone('Africa/Nairobi')
     dl_local = gw.start_time_eat.strftime('%b %d, %Y at %I:%M %p EAT') if gw.start_time else 'N/A'
 
-    if member and has_existing and existing_paid < standard_due:
+    if member and has_existing and existing_paid >= standard_due and balance_due > Decimal('0.00'):
+        msg = f"⚠️ {member.manager_name} paid the Ksh. 150 standard contribution late for {gw.name}, but owes the Ksh. 50 late fine (Bal: Ksh. {balance_due:,.2f}). New payment will clear this fine."
+    elif member and has_existing and existing_paid < total_target:
         msg = f"ℹ️ {member.manager_name} has existing partial payment of Ksh. {existing_paid:,.2f} on {gw.name}. New payment will complete {gw.name} (Bal: Ksh. {balance_due:,.2f}) and cascade any excess to next GWs via FIFO."
     elif member and not has_existing:
         joined_note = f" (joined GW {member.joined_gameweek})" if getattr(member, 'joined_gameweek', 1) > 1 and gw.number == member.joined_gameweek else ""
-        msg = f"ℹ️ Auto FIFO: Payment for {member.manager_name} will start sequentially at {gw.name}{joined_note} and cascade in Ksh. 150 increments across future unpaid GWs."
+        if is_late:
+            msg = f"⚠️ Payment for {member.manager_name} is late for {gw.name} (kickoff was {dl_local}). Total required is Ksh. 200 (Ksh. 150 fee + Ksh. 50 fine)."
+        else:
+            msg = f"ℹ️ Auto FIFO: Payment for {member.manager_name} will start sequentially at {gw.name}{joined_note} and cascade in Ksh. 150 increments across future unpaid GWs."
     elif is_waived:
         waiver_reason = {
             1: "Season Kickoff Waiver",
