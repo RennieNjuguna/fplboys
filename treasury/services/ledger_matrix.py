@@ -251,7 +251,7 @@ def get_active_gw_flagged_summary(target_gw_num=None, target_gw_number=None) -> 
     for member in members:
         joined_gw = getattr(member, 'joined_gameweek', 1)
         member_defaults = []
-        member_balance_sum = Decimal('0.00')
+        member_fee_unpaid = Decimal('0.00')
         member_fines_sum = Decimal('0.00')
 
         for gw in past_gws:
@@ -269,27 +269,27 @@ def get_active_gw_flagged_summary(target_gw_num=None, target_gw_number=None) -> 
 
             if paid < standard_fee:
                 fine = Decimal('50.00') if not gw_waived else Decimal('0.00')
-                bal = (standard_fee - paid) + fine
-                member_balance_sum += bal
+                fee_bal = standard_fee - paid
+                total_due_gw = fee_bal + fine
+                member_fee_unpaid += fee_bal
                 member_fines_sum += fine
                 member_defaults.append({
                     'gw_number': gw.number,
                     'amount_paid': paid,
-                    'balance_due': bal,
+                    'balance_due': fee_bal,
                     'late_fine': fine,
                     'is_waived': gw_waived,
                     'is_late_payment': False,
                     'is_fine_paid': False,
-                    'total_due': bal
+                    'total_due': total_due_gw
                 })
             elif fine_unpaid:
                 fine = payment.late_fine_amount or Decimal('50.00')
-                member_balance_sum += fine
                 member_fines_sum += fine
                 member_defaults.append({
                     'gw_number': gw.number,
                     'amount_paid': paid,
-                    'balance_due': fine,
+                    'balance_due': Decimal('0.00'),
                     'late_fine': fine,
                     'is_waived': False,
                     'is_late_payment': True,
@@ -312,7 +312,6 @@ def get_active_gw_flagged_summary(target_gw_num=None, target_gw_number=None) -> 
             gw_summary_parts = []
             has_late_payment = False
             for d in member_defaults:
-                fine_note = " (Waived Fine)" if d['is_waived'] else (" (+50 Fine)" if d['late_fine'] > 0 and d['total_due'] > 0 else "")
                 if d.get('is_late_payment'):
                     has_late_payment = True
                     if d.get('is_fine_paid'):
@@ -320,11 +319,21 @@ def get_active_gw_flagged_summary(target_gw_num=None, target_gw_number=None) -> 
                     else:
                         gw_summary_parts.append(f"GW {d['gw_number']} (Late Payment - Ksh. {d['total_due']:,.0f} Fine Due)")
                 elif d['amount_paid'] > Decimal('0.00'):
-                    gw_summary_parts.append(f"GW {d['gw_number']} (Bal Ksh. {d['balance_due']:,.0f}{fine_note})")
+                    if d['is_waived']:
+                        gw_summary_parts.append(f"GW {d['gw_number']} (Bal Ksh. {d['balance_due']:,.0f} (Waived Fine))")
+                    elif d['late_fine'] > Decimal('0.00'):
+                        gw_summary_parts.append(f"GW {d['gw_number']} (Bal Ksh. {d['balance_due']:,.0f} + {d['late_fine']:,.0f} Fine)")
+                    else:
+                        gw_summary_parts.append(f"GW {d['gw_number']} (Bal Ksh. {d['balance_due']:,.0f})")
                 else:
-                    gw_summary_parts.append(f"GW {d['gw_number']} (Ksh. {d['balance_due']:,.0f}{fine_note})")
+                    if d['is_waived']:
+                        gw_summary_parts.append(f"GW {d['gw_number']} (Ksh. {d['balance_due']:,.0f} (Waived Fine))")
+                    elif d['late_fine'] > Decimal('0.00'):
+                        gw_summary_parts.append(f"GW {d['gw_number']} (Ksh. {d['balance_due']:,.0f} + {d['late_fine']:,.0f} Fine)")
+                    else:
+                        gw_summary_parts.append(f"GW {d['gw_number']} (Ksh. {d['balance_due']:,.0f})")
 
-            total_member_due = member_balance_sum
+            total_member_due = member_fee_unpaid + member_fines_sum
             total_defaulters_amount += total_member_due
 
             flagged_defaulters.append({
@@ -332,7 +341,8 @@ def get_active_gw_flagged_summary(target_gw_num=None, target_gw_number=None) -> 
                 'defaulted_gws': member_defaults,
                 'defaulted_count': len(member_defaults),
                 'gws_summary_text': " • ".join(gw_summary_parts),
-                'total_balance_due': member_balance_sum,
+                'total_fee_unpaid': member_fee_unpaid,
+                'total_balance_due': member_fee_unpaid,
                 'total_fines': member_fines_sum,
                 'total_due': total_member_due,
                 'has_fines': member_fines_sum > Decimal('0.00'),

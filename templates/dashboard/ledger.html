@@ -155,10 +155,12 @@
                             <span class="text-[9px] text-rose-400 block mt-0.5 font-medium">
                                 {% if item.total_due == 0 and item.has_late_payment %}
                                 <span class="text-amber-400">Late Payment (Fine Paid)</span>
+                                {% elif item.has_fines and item.total_fee_unpaid > 0 %}
+                                Fee: {{ item.total_fee_unpaid|floatformat:0 }} + {{ item.total_fines|floatformat:0 }} fine
                                 {% elif item.has_fines %}
-                                Bal: {{ item.total_balance_due|floatformat:0 }} + {{ item.total_fines|floatformat:0 }} fine
+                                Fine: {{ item.total_fines|floatformat:0 }}
                                 {% else %}
-                                Fee: {{ item.total_balance_due|floatformat:0 }} (0 fine)
+                                Fee: {{ item.total_fee_unpaid|floatformat:0 }} (0 fine)
                                 {% endif %}
                             </span>
                         </div>
