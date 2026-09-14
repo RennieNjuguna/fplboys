@@ -311,6 +311,10 @@
                         <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
                         <span class="font-semibold">Late (+50 fine)</span>
                     </div>
+                    <div class="flex items-center space-x-1.5 bg-emerald-950/70 border border-emerald-800/80 px-2 py-0.5 rounded-lg text-emerald-300">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                        <span class="font-semibold">Late (Fine Paid)</span>
+                    </div>
                     <div class="flex items-center space-x-1.5 bg-rose-950/70 border border-rose-800/80 px-2 py-0.5 rounded-lg text-rose-300">
                         <span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
                         <span class="font-semibold">Due (150)</span>
@@ -378,13 +382,15 @@
 
                             <!-- GW Cells -->
                             {% for cell in row.cells %}
-                            <td class="px-1.5 sm:px-2 py-2 sm:py-2.5 text-center border-r border-gray-800/40 {% if cell.status == 'PAID' %}bg-emerald-950/30 text-emerald-300{% elif cell.status == 'PARTIAL' %}bg-amber-950/20 text-amber-300{% elif cell.status == 'LATE' %}bg-amber-950/40 text-amber-300{% elif cell.status == 'UNPAID' %}bg-rose-950/40 text-rose-300{% elif cell.status == 'PARDON' %}bg-purple-950/30 text-purple-300{% else %}bg-gray-900/30 text-gray-600{% endif %}">
+                            <td class="px-1.5 sm:px-2 py-2 sm:py-2.5 text-center border-r border-gray-800/40 {% if cell.status == 'PAID' or cell.status == 'PAID_LATE_CLEARED' %}bg-emerald-950/30 text-emerald-300{% elif cell.status == 'PARTIAL' %}bg-amber-950/20 text-amber-300{% elif cell.status == 'LATE' %}bg-amber-950/40 text-amber-300{% elif cell.status == 'UNPAID' %}bg-rose-950/40 text-rose-300{% elif cell.status == 'PARDON' %}bg-purple-950/30 text-purple-300{% else %}bg-gray-900/30 text-gray-600{% endif %}">
                                 
-                                {% if cell.status == 'PAID' %}
+                                {% if cell.status == 'PAID' or cell.status == 'PAID_LATE_CLEARED' %}
                                 <div class="font-bold text-[10px] sm:text-[11px] text-emerald-300">
                                     ✓ {{ cell.amount_paid|floatformat:0 }}
                                 </div>
-                                {% if 'PRIZE' in cell.mpesa_code|default:'' %}
+                                {% if cell.status == 'PAID_LATE_CLEARED' or cell.fine_paid %}
+                                <div class="text-[8px] text-emerald-400 font-semibold tracking-tight" title="Paid late with Ksh. 50 late fine fully paid">+50 fine paid</div>
+                                {% elif 'PRIZE' in cell.mpesa_code|default:'' %}
                                 <div class="text-[8px] text-purple-300 font-semibold tracking-tight" title="Paid using reinvested prize winnings">From Pot</div>
                                 {% elif 'Carryover' in cell.mpesa_code|default:'' %}
                                 <div class="text-[8px] text-cyan-300 font-semibold tracking-tight" title="Paid in advance via bulk payment">Advance</div>

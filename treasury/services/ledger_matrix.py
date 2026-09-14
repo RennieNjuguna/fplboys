@@ -68,9 +68,13 @@ def build_financial_ledger_matrix(max_gws=38):
                 
                 if amount_paid >= standard_due:
                     if is_late_payment:
-                        status = 'LATE'
+                        if payment.fine_paid:
+                            status = 'PAID_LATE_CLEARED'
+                        else:
+                            status = 'LATE'
                         row_late_count += 1
                         col_totals[gw.id]['late_count'] += 1
+                        col_totals[gw.id]['paid_count'] += 1
                     else:
                         status = 'PAID'
                         col_totals[gw.id]['paid_count'] += 1
@@ -104,12 +108,13 @@ def build_financial_ledger_matrix(max_gws=38):
             cell = {
                 'gw_number': gw.number,
                 'gw_id': gw.id,
-                'status': status,  # 'PAID', 'PARTIAL', 'LATE', 'UNPAID', 'UPCOMING'
+                'status': status,  # 'PAID', 'PAID_LATE_CLEARED', 'PARTIAL', 'LATE', 'UNPAID', 'UPCOMING'
                 'payment': payment,
                 'gw_result': gw_res,
                 'amount_paid': amount_paid,
                 'balance_due': balance_due,
                 'late_fine': late_fine,
+                'fine_paid': payment.fine_paid if payment else False,
                 'prize_won': prize_won,
                 'net_points': net_points,
                 'is_late': payment.is_late if payment else False,

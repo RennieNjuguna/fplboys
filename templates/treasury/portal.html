@@ -320,9 +320,15 @@
                                 </td>
                                 <td class="px-4 py-3 text-center">
                                     {% if p.is_late %}
-                                    <span class="bg-amber-950 text-amber-300 border border-amber-800 px-1.5 py-0.5 rounded text-[10px] font-bold">
-                                        Late (+50)
-                                    </span>
+                                        {% if p.fine_paid %}
+                                        <span class="bg-emerald-950 text-emerald-300 border border-emerald-800 px-1.5 py-0.5 rounded text-[10px] font-bold">
+                                            Late (Fine Paid)
+                                        </span>
+                                        {% else %}
+                                        <span class="bg-amber-950 text-amber-300 border border-amber-800 px-1.5 py-0.5 rounded text-[10px] font-bold">
+                                            Late (+50)
+                                        </span>
+                                        {% endif %}
                                     {% else %}
                                     <span class="bg-emerald-950 text-emerald-300 border border-emerald-800 px-1.5 py-0.5 rounded text-[10px] font-bold">
                                         On Time

@@ -1081,6 +1081,29 @@ class TreasuryFinancialTests(TestCase):
         self.assertEqual(get_member_available_prize_balance(self.m1), Decimal('0.00'))
         self.assertEqual(get_member_available_prize_balance(self.m2), Decimal('83.33'))
 
+    def test_matrix_cell_paid_late_cleared_when_fine_paid(self):
+        """When a member pays late (Ksh 150) and also pays the fine (fine_paid=True), cell status becomes PAID_LATE_CLEARED"""
+        p = Payment.objects.create(
+            member=self.m1,
+            gameweek=self.gw3,
+            amount_paid=Decimal('150.00'),
+            timestamp_received=self.deadline + timedelta(hours=2),
+            mpesa_code="LATEPAY",
+            is_late=True,
+            late_fine_amount=Decimal('50.00'),
+            fine_paid=True,
+            verified=True
+        )
+
+        matrix = build_financial_ledger_matrix()
+        row = next(r for r in matrix['rows'] if r['member'] == self.m1)
+        cell = next(c for c in row['cells'] if c['gw_number'] == 3)
+
+        self.assertEqual(cell['status'], 'PAID_LATE_CLEARED')
+        self.assertTrue(cell['fine_paid'])
+        self.assertTrue(cell['is_late'])
+
+
 
 
 
