@@ -259,10 +259,10 @@
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
             {% for winner in gw_podium %}
-            <div class="rounded-2xl p-4 sm:p-5 border {% if winner.league_rank == 1 %}bg-gradient-to-b from-amber-950/30 to-gray-900 border-amber-500/40{% elif winner.league_rank == 2 %}bg-gradient-to-b from-slate-900/50 to-gray-900 border-slate-400/30{% else %}bg-gradient-to-b from-amber-900/20 to-gray-900 border-amber-700/30{% endif %}">
+            <div class="rounded-2xl p-4 sm:p-5 border {% if forloop.counter == 1 %}bg-gradient-to-b from-amber-950/30 to-gray-900 border-amber-500/40{% elif forloop.counter == 2 %}bg-gradient-to-b from-slate-900/50 to-gray-900 border-slate-400/30{% else %}bg-gradient-to-b from-amber-900/20 to-gray-900 border-amber-700/30{% endif %}">
                 <div class="flex items-center justify-between">
-                    <span class="px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-black {% if winner.league_rank == 1 %}bg-amber-400 text-black{% elif winner.league_rank == 2 %}bg-slate-300 text-black{% else %}bg-amber-700 text-white{% endif %}">
-                        {% if winner.league_rank == 1 %}🥇 1st Place{% elif winner.league_rank == 2 %}🥈 2nd Place{% else %}🥉 3rd Place{% endif %}
+                    <span class="px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-black {% if forloop.counter == 1 %}bg-amber-400 text-black{% elif forloop.counter == 2 %}bg-slate-300 text-black{% else %}bg-amber-700 text-white{% endif %}">
+                        {% if forloop.counter == 1 %}🥇 1st Place{% elif forloop.counter == 2 %}🥈 2nd Place{% else %}🥉 3rd Place{% endif %}
                     </span>
                     {% if selected_podium_gw.status == 'finalizing' %}
                     <span class="text-xs font-bold text-amber-400 font-mono bg-amber-950/60 px-2 py-0.5 rounded border border-amber-500/30">

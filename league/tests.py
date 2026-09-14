@@ -269,6 +269,31 @@ class FinalizingGameweekTests(TestCase):
         GameweekResult.objects.create(member=self.m2, gameweek=self.gw, gw_points=70, transfer_cost=4)
         GameweekResult.objects.create(member=self.m3, gameweek=self.gw, gw_points=60, transfer_cost=0)
 
+        Payment.objects.create(
+            member=self.m1,
+            gameweek=self.gw,
+            amount_paid=Decimal('150.00'),
+            timestamp_received=self.deadline - timedelta(hours=2),
+            verified=True,
+            is_late=False
+        )
+        Payment.objects.create(
+            member=self.m2,
+            gameweek=self.gw,
+            amount_paid=Decimal('150.00'),
+            timestamp_received=self.deadline - timedelta(hours=2),
+            verified=True,
+            is_late=False
+        )
+        Payment.objects.create(
+            member=self.m3,
+            gameweek=self.gw,
+            amount_paid=Decimal('150.00'),
+            timestamp_received=self.deadline - timedelta(hours=2),
+            verified=True,
+            is_late=False
+        )
+
     def test_finalizing_payout_engine_holds_payouts(self):
         """When a gameweek is in 'finalizing' state, ranks are assigned but prizes are held at 0.00 and payout_calculated is False."""
         results = calculate_gameweek_payouts(self.gw)
@@ -298,5 +323,35 @@ class FinalizingGameweekTests(TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "Provisional")
         self.assertContains(resp, "Finalizing Bonuses")
+
+    def test_disqualified_member_excluded_from_provisional_podium(self):
+        """Disqualified member (late payment) is excluded from podium and prize rolls down to next eligible manager."""
+        m4 = Member.objects.create(fpl_entry_id=5004, manager_name="David", team_name="Team D")
+        GameweekResult.objects.create(member=m4, gameweek=self.gw, gw_points=50, transfer_cost=0)
+        Payment.objects.create(
+            member=m4,
+            gameweek=self.gw,
+            amount_paid=Decimal('150.00'),
+            timestamp_received=self.deadline - timedelta(hours=2),
+            verified=True,
+            is_late=False
+        )
+
+        # Mark m3 payment as late
+        p3 = Payment.objects.get(member=self.m3, gameweek=self.gw)
+        p3.timestamp_received = self.deadline + timedelta(hours=2)
+        p3.save()
+
+        calculate_gameweek_payouts(self.gw)
+        resp = self.client.get('/')
+        self.assertEqual(resp.status_code, 200)
+        gw_podium = resp.context['gw_podium']
+
+        podium_member_ids = [r.member.id for r in gw_podium]
+        self.assertIn(self.m1.id, podium_member_ids)
+        self.assertIn(self.m2.id, podium_member_ids)
+        self.assertIn(m4.id, podium_member_ids)
+        self.assertNotIn(self.m3.id, podium_member_ids)
+
 
 

@@ -3,6 +3,7 @@ from django.shortcuts import render, get_object_or_404
 from django.http import JsonResponse
 from django.db.models import Sum, Max, Min, Avg
 from league.models import Member, Gameweek, GameweekResult
+from league.services.payout_engine import is_member_eligible_for_prize
 from treasury.models import Payment
 from treasury.services.pot_calculator import get_treasury_summary, get_member_financial_leaderboard
 
@@ -44,10 +45,11 @@ def dashboard_overview(request):
 
     gw_podium = []
     if selected_podium_gw:
-        if selected_podium_gw.status == 'finished':
-            gw_podium = selected_podium_gw.results.filter(is_top3=True).select_related('member').order_by('league_rank')
+        if selected_podium_gw.status == 'finished' and selected_podium_gw.payout_calculated:
+            gw_podium = list(selected_podium_gw.results.filter(is_top3=True).select_related('member').order_by('league_rank'))
         else:
-            gw_podium = selected_podium_gw.results.select_related('member').order_by('league_rank', '-net_points')[:3]
+            all_res = list(selected_podium_gw.results.select_related('member').order_by('league_rank', '-net_points'))
+            gw_podium = [r for r in all_res if is_member_eligible_for_prize(r.member, selected_podium_gw)][:3]
 
     # Next upcoming/active gameweek
     current_or_next_gw = Gameweek.objects.filter(status__in=['active', 'finalizing', 'upcoming']).order_by('number').first()
@@ -136,8 +138,10 @@ def standings_view(request):
         try:
             target_gw = Gameweek.objects.get(number=int(selected_gw_num))
             selected_gw_obj = target_gw
-            results = target_gw.results.select_related('member').order_by('league_rank', '-net_points')
+            results = list(target_gw.results.select_related('member').order_by('league_rank', '-net_points'))
+            eligible_top3_ids = {r.member_id for r in [x for x in results if is_member_eligible_for_prize(x.member, target_gw)][:3]}
             for r in results:
+                is_eligible = is_member_eligible_for_prize(r.member, target_gw)
                 standings_rows.append({
                     'rank': r.league_rank,
                     'member': r.member,
@@ -147,6 +151,8 @@ def standings_view(request):
                     'overall_rank': r.overall_rank,
                     'prize_won': r.gw_prize_won,
                     'is_top3': r.is_top3,
+                    'is_eligible': is_eligible,
+                    'is_provisional_top3': (r.member_id in eligible_top3_ids),
                     'movement': r.rank_movement,
                 })
         except Gameweek.DoesNotExist:

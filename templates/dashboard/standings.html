@@ -167,9 +167,13 @@
                             <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-bold bg-emerald-950 text-emerald-300 border border-emerald-700">
                                 💰 Ksh. {{ row.prize_won|floatformat:0 }}
                             </span>
-                            {% elif filter_type == 'gw' and selected_gw and selected_gw.status == 'finalizing' and row.rank <= 3 %}
+                            {% elif filter_type == 'gw' and selected_gw and selected_gw.status == 'finalizing' and row.is_provisional_top3 %}
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] sm:text-xs font-bold bg-amber-950/60 text-amber-400 border border-amber-500/40">
                                 Provisional
+                            </span>
+                            {% elif filter_type == 'gw' and not row.is_eligible %}
+                            <span class="text-rose-400 text-[10px] font-semibold" title="Disqualified from cash prizes due to late/unpaid contribution">
+                                Ineligible
                             </span>
                             {% else %}
                             <span class="text-gray-500 text-xs">-</span>
