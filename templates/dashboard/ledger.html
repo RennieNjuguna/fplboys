@@ -357,10 +357,10 @@
 
                             <!-- GW Columns (GW 1 to 38) -->
                             {% for gw in matrix.gameweeks %}
-                            <th class="px-2 sm:px-3 py-2 text-center min-w-[75px] sm:min-w-[85px] border-r border-gray-800/60 {% if gw.is_current or gw.status == 'active' %}bg-purple-950/70 text-fpl-green{% elif gw.status == 'finished' %}bg-gray-800/80 text-gray-200{% else %}bg-gray-900/90 text-gray-500{% endif %}">
+                            <th class="px-2 sm:px-3 py-2 text-center min-w-[75px] sm:min-w-[85px] border-r border-gray-800/60 {% if gw.is_current or gw.status == 'active' %}bg-purple-950/70 text-fpl-green{% elif gw.status == 'finalizing' %}bg-amber-950/60 text-amber-300{% elif gw.status == 'finished' %}bg-gray-800/80 text-gray-200{% else %}bg-gray-900/90 text-gray-500{% endif %}">
                                 <div class="font-bold text-[11px] sm:text-xs">GW {{ gw.number }}</div>
                                 <div class="text-[9px] font-normal lowercase tracking-normal">
-                                    {% if gw.status == 'finished' %}done{% elif gw.status == 'active' %}live{% else %}{{ gw.deadline_eat|date:"d M" }}{% endif %}
+                                    {% if gw.status == 'finished' %}done{% elif gw.status == 'finalizing' %}auditing{% elif gw.status == 'active' %}live{% else %}{{ gw.deadline_eat|date:"d M" }}{% endif %}
                                 </div>
                             </th>
                             {% endfor %}

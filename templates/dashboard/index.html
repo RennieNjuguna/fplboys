@@ -35,9 +35,9 @@
                 <div class="text-xs sm:text-sm font-black text-white truncate">
                     {{ current_or_next_gw.deadline_eat|date:"D, d M @ H:i" }} EAT
                 </div>
-                <div class="text-[10px] sm:text-[11px] {% if current_or_next_gw.status == 'active' %}text-amber-400 font-bold{% elif current_or_next_gw.is_past_deadline %}text-red-400{% else %}text-emerald-400{% endif %} flex items-center mt-0.5">
-                    <span class="w-1.5 h-1.5 rounded-full {% if current_or_next_gw.status == 'active' %}bg-amber-400 animate-ping{% elif current_or_next_gw.is_past_deadline %}bg-red-400{% else %}bg-emerald-400 animate-pulse{% endif %} mr-1.5 flex-shrink-0"></span>
-                    <span class="truncate">{{ current_or_next_gw.get_status_display }}</span>
+                <div class="text-[10px] sm:text-[11px] {% if current_or_next_gw.status == 'active' or current_or_next_gw.status == 'finalizing' %}text-amber-400 font-bold{% elif current_or_next_gw.is_past_deadline %}text-red-400{% else %}text-emerald-400{% endif %} flex items-center mt-0.5">
+                    <span class="w-1.5 h-1.5 rounded-full {% if current_or_next_gw.status == 'active' %}bg-amber-400 animate-ping{% elif current_or_next_gw.status == 'finalizing' %}bg-amber-400 animate-pulse{% elif current_or_next_gw.is_past_deadline %}bg-red-400{% else %}bg-emerald-400 animate-pulse{% endif %} mr-1.5 flex-shrink-0"></span>
+                    <span class="truncate">{% if current_or_next_gw.status == 'finalizing' %}⏳ Finalizing Bonuses...{% else %}{{ current_or_next_gw.get_status_display }}{% endif %}</span>
                 </div>
             </div>
         </div>
@@ -215,11 +215,19 @@
                     <span class="text-[10px] sm:text-xs font-bold text-fpl-green uppercase tracking-wider">
                         {{ selected_podium_gw.name }} Podium
                     </span>
-                    {% if selected_podium_gw == latest_finished_gw %}
+                    {% if selected_podium_gw.status == 'finalizing' %}
+                    <span class="bg-amber-500/20 text-amber-300 text-[9px] font-bold px-2 py-0.5 rounded border border-amber-500/40 animate-pulse">⏳ Finalizing Bonuses</span>
+                    {% elif selected_podium_gw == latest_finished_gw %}
                     <span class="bg-fpl-green/10 text-fpl-green text-[9px] font-bold px-1.5 py-0.2 rounded border border-fpl-green/30">Latest</span>
                     {% endif %}
                 </div>
-                <h3 class="text-base sm:text-lg font-bold text-white mt-0.5">Top 3 Weekly Winners & Payouts</h3>
+                <h3 class="text-base sm:text-lg font-bold text-white mt-0.5">
+                    {% if selected_podium_gw.status == 'finalizing' %}
+                        Provisional Top 3 Standings
+                    {% else %}
+                        Top 3 Weekly Winners & Payouts
+                    {% endif %}
+                </h3>
             </div>
 
             <div class="flex items-center space-x-3">
@@ -230,7 +238,7 @@
                     <select name="podium_gw" onchange="this.form.submit()" class="bg-gray-800 border border-purple-700/60 text-white text-xs font-semibold rounded-lg px-2.5 py-1 focus:ring-fpl-green">
                         {% for gw in finished_gws %}
                         <option value="{{ gw.number }}" {% if selected_podium_gw.number == gw.number %}selected{% endif %}>
-                            {{ gw.name }} {% if gw == latest_finished_gw %}(Latest){% endif %}
+                            {{ gw.name }} {% if gw.status == 'finalizing' %}(Finalizing){% elif gw == latest_finished_gw %}(Latest){% endif %}
                         </option>
                         {% endfor %}
                     </select>
@@ -240,6 +248,15 @@
             </div>
         </div>
 
+        {% if selected_podium_gw.status == 'finalizing' %}
+        <div class="mb-4 bg-amber-950/40 border border-amber-500/40 rounded-xl p-3 flex items-center space-x-2.5 text-xs text-amber-200">
+            <span class="text-base flex-shrink-0">⏳</span>
+            <span>
+                <strong>Gameweek Ending — Finalizing Bonuses & Autosubs:</strong> Official podium winners and prize payouts will be declared after FPL completes overnight data verification.
+            </span>
+        </div>
+        {% endif %}
+
         <div class="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
             {% for winner in gw_podium %}
             <div class="rounded-2xl p-4 sm:p-5 border {% if winner.league_rank == 1 %}bg-gradient-to-b from-amber-950/30 to-gray-900 border-amber-500/40{% elif winner.league_rank == 2 %}bg-gradient-to-b from-slate-900/50 to-gray-900 border-slate-400/30{% else %}bg-gradient-to-b from-amber-900/20 to-gray-900 border-amber-700/30{% endif %}">
@@ -247,9 +264,15 @@
                     <span class="px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-black {% if winner.league_rank == 1 %}bg-amber-400 text-black{% elif winner.league_rank == 2 %}bg-slate-300 text-black{% else %}bg-amber-700 text-white{% endif %}">
                         {% if winner.league_rank == 1 %}🥇 1st Place{% elif winner.league_rank == 2 %}🥈 2nd Place{% else %}🥉 3rd Place{% endif %}
                     </span>
+                    {% if selected_podium_gw.status == 'finalizing' %}
+                    <span class="text-xs font-bold text-amber-400 font-mono bg-amber-950/60 px-2 py-0.5 rounded border border-amber-500/30">
+                        Provisional
+                    </span>
+                    {% else %}
                     <span class="text-sm sm:text-base font-black text-emerald-400 font-mono">
                         Ksh. {{ winner.gw_prize_won|floatformat:2 }}
                     </span>
+                    {% endif %}
                 </div>
                 <h4 class="text-sm sm:text-base font-bold text-white mt-2.5 sm:mt-3 truncate">
                     <a href="{% url 'manager_detail' winner.member.id %}" class="hover:text-fpl-green transition-colors">

@@ -78,6 +78,15 @@
             <span class="text-[11px] sm:text-xs text-gray-400 flex-shrink-0 ml-2">10 Members</span>
         </div>
 
+        {% if filter_type == 'gw' and selected_gw and selected_gw.status == 'finalizing' %}
+        <div class="bg-amber-950/40 border-b border-amber-500/40 px-4 sm:px-6 py-3 flex items-center space-x-2.5 text-xs text-amber-200">
+            <span class="text-base flex-shrink-0">⏳</span>
+            <span>
+                <strong>Gameweek {{ selected_gw.number }} Ending — Finalizing Bonuses & Autosubs:</strong> Points shown are provisional. Official podium winners and prize payouts will be declared after FPL completes its overnight data audit.
+            </span>
+        </div>
+        {% endif %}
+
         <div class="overflow-x-auto" style="-webkit-overflow-scrolling: touch;">
             <table class="w-full text-left text-xs sm:text-sm text-gray-300">
                 <thead class="text-[10px] sm:text-xs uppercase bg-gray-800/80 text-gray-400 font-bold border-b border-gray-800">
@@ -157,6 +166,10 @@
                             {% if row.prize_won > 0 %}
                             <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-bold bg-emerald-950 text-emerald-300 border border-emerald-700">
                                 💰 Ksh. {{ row.prize_won|floatformat:0 }}
+                            </span>
+                            {% elif filter_type == 'gw' and selected_gw and selected_gw.status == 'finalizing' and row.rank <= 3 %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] sm:text-xs font-bold bg-amber-950/60 text-amber-400 border border-amber-500/40">
+                                Provisional
                             </span>
                             {% else %}
                             <span class="text-gray-500 text-xs">-</span>

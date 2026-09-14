@@ -146,7 +146,7 @@ def treasurer_portal_view(request):
 
                 else:
                     # Publish latest finished/active gameweek only (never loop & overwrite all)
-                    latest_gw = Gameweek.objects.filter(status__in=['finished', 'active']).order_by('-number').first()
+                    latest_gw = Gameweek.objects.filter(status__in=['finished', 'finalizing', 'active']).order_by('-number').first()
                     if latest_gw:
                         ed = load_edition_from_disk(latest_gw.number, force_publish=True)
                         if not ed:
@@ -524,7 +524,7 @@ def api_check_deadline(request):
             gw = Gameweek.objects.filter(number__gte=joined_gw).order_by('-number').first()
 
     if not gw:
-        gw = Gameweek.objects.filter(status__in=['active', 'upcoming']).order_by('number').first() or Gameweek.objects.first()
+        gw = Gameweek.objects.filter(status__in=['active', 'finalizing', 'upcoming']).order_by('number').first() or Gameweek.objects.first()
 
     if not gw:
         return JsonResponse({'error': 'No gameweek available'}, status=400)

@@ -43,8 +43,8 @@ def get_treasury_summary():
     # Weekly prize pool net balance
     prize_pool_balance = standard_prize_pool_portion - Decimal(str(total_prizes_distributed))
 
-    # Finished and active gameweeks to date
-    finished_or_active_gws = Gameweek.objects.filter(status__in=['finished', 'active'])
+    # Finished, finalizing, and active gameweeks to date
+    finished_or_active_gws = Gameweek.objects.filter(status__in=['finished', 'finalizing', 'active'])
     gws_count = finished_or_active_gws.count()
     active_members = list(Member.objects.filter(is_active=True))
     expected_contributions_count = 0

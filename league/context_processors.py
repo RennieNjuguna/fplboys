@@ -8,7 +8,7 @@ def league_context(request):
     """
     current_gw = Gameweek.objects.filter(is_current=True).first()
     if not current_gw:
-        current_gw = Gameweek.objects.filter(status='active').first()
+        current_gw = Gameweek.objects.filter(status__in=['active', 'finalizing']).first()
     if not current_gw:
         current_gw = Gameweek.objects.filter(status='finished').order_by('-number').first()
 

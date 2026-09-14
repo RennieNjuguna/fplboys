@@ -126,17 +126,17 @@ class FPLSyncService:
             else:
                 deadline_dt = timezone.now()
 
-            # Determine status
-            is_finished = event.get('finished', False) or event.get('data_checked', False)
+            # Determine status based on official FPL flags
+            is_data_checked = event.get('data_checked', False)
+            is_event_finished = event.get('finished', False)
             is_current = event.get('is_current', False)
             is_next = event.get('is_next', False)
 
-            if is_finished:
+            if is_data_checked:
                 status = 'finished'
             elif timezone.now() >= deadline_dt:
-                # Deadline has passed: check if all fixtures finished or 3.5 days elapsed
-                if self.check_gameweek_fixtures_finished(gw_num):
-                    status = 'finished'
+                if self.check_gameweek_fixtures_finished(gw_num) or is_event_finished:
+                    status = 'finalizing'
                 elif timezone.now() >= deadline_dt + timezone.timedelta(days=3, hours=12):
                     status = 'finished'
                 else:
@@ -219,7 +219,7 @@ class FPLSyncService:
     def sync_gameweek_results(self, target_gw_number=None):
         """
         Fetches member scores and transfer costs, updates GameweekResult records,
-        and triggers payout calculations for finished/active gameweeks.
+        and triggers payout calculations for finished/finalizing/active gameweeks.
         """
         members = Member.objects.filter(is_active=True)
         if not members.exists():
@@ -229,8 +229,8 @@ class FPLSyncService:
         if target_gw_number:
             gameweeks = Gameweek.objects.filter(number=target_gw_number)
         else:
-            # Sync for all gameweeks that are not 'upcoming' (i.e. active or finished)
-            gameweeks = Gameweek.objects.filter(status__in=['active', 'finished']).order_by('number')
+            # Sync for all gameweeks that are not 'upcoming' (i.e. active, finalizing, or finished)
+            gameweeks = Gameweek.objects.filter(status__in=['active', 'finalizing', 'finished']).order_by('number')
 
         updated_results_count = 0
 
@@ -272,11 +272,28 @@ class FPLSyncService:
                     )
                     updated_results_count += 1
 
-        # Now check if active gameweeks finished, and calculate payouts for each synced gameweek
+        # Check official FPL data_checked status and calculate payouts
+        bootstrap_data = self.fetch_bootstrap()
+        event_dict = {ev['id']: ev for ev in (bootstrap_data.get('events', []) if bootstrap_data else [])}
+
         for gw in gameweeks:
-            if gw.status == 'active' and (self.check_gameweek_fixtures_finished(gw.number) or (gw.deadline_time and timezone.now() >= gw.deadline_time + timezone.timedelta(days=3, hours=12))):
-                gw.status = 'finished'
-                gw.save(update_fields=['status'])
+            ev_info = event_dict.get(gw.number, {})
+            is_data_checked = ev_info.get('data_checked', False)
+            is_event_finished = ev_info.get('finished', False)
+
+            if is_data_checked:
+                if gw.status != 'finished':
+                    gw.status = 'finished'
+                    gw.save(update_fields=['status'])
+            elif gw.status in ['active', 'finalizing']:
+                if self.check_gameweek_fixtures_finished(gw.number) or is_event_finished:
+                    if gw.status != 'finalizing':
+                        gw.status = 'finalizing'
+                        gw.save(update_fields=['status'])
+                elif gw.deadline_time and timezone.now() >= gw.deadline_time + timezone.timedelta(days=3, hours=12):
+                    gw.status = 'finished'
+                    gw.save(update_fields=['status'])
+
             calculate_gameweek_payouts(gw)
 
         AuditLog.objects.create(

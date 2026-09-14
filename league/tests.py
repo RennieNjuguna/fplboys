@@ -250,3 +250,53 @@ class ManagerProfileViewTests(TestCase):
         self.assertEqual(chart_payload['manager_ranks'], [1, 1])
         self.assertEqual(chart_payload['cumulative_points'], [70, 155])
 
+
+class FinalizingGameweekTests(TestCase):
+    def setUp(self):
+        self.deadline = timezone.now() - timedelta(days=2)
+        self.gw = Gameweek.objects.create(
+            number=5,
+            name="Gameweek 5",
+            deadline_time=self.deadline,
+            status='finalizing',
+            prize_pool_amount=Decimal('500.00')
+        )
+        self.m1 = Member.objects.create(fpl_entry_id=5001, manager_name="Alice", team_name="Team A")
+        self.m2 = Member.objects.create(fpl_entry_id=5002, manager_name="Bob", team_name="Team B")
+        self.m3 = Member.objects.create(fpl_entry_id=5003, manager_name="Charlie", team_name="Team C")
+
+        GameweekResult.objects.create(member=self.m1, gameweek=self.gw, gw_points=80, transfer_cost=0)
+        GameweekResult.objects.create(member=self.m2, gameweek=self.gw, gw_points=70, transfer_cost=4)
+        GameweekResult.objects.create(member=self.m3, gameweek=self.gw, gw_points=60, transfer_cost=0)
+
+    def test_finalizing_payout_engine_holds_payouts(self):
+        """When a gameweek is in 'finalizing' state, ranks are assigned but prizes are held at 0.00 and payout_calculated is False."""
+        results = calculate_gameweek_payouts(self.gw)
+        self.gw.refresh_from_db()
+        self.assertFalse(self.gw.payout_calculated)
+
+        res_1 = GameweekResult.objects.get(member=self.m1, gameweek=self.gw)
+        res_2 = GameweekResult.objects.get(member=self.m2, gameweek=self.gw)
+        res_3 = GameweekResult.objects.get(member=self.m3, gameweek=self.gw)
+
+        self.assertEqual(res_1.league_rank, 1)
+        self.assertEqual(res_1.gw_prize_won, Decimal('0.00'))
+        self.assertFalse(res_1.is_top3)
+
+        self.assertEqual(res_2.league_rank, 2)
+        self.assertEqual(res_2.gw_prize_won, Decimal('0.00'))
+        self.assertFalse(res_2.is_top3)
+
+        self.assertEqual(res_3.league_rank, 3)
+        self.assertEqual(res_3.gw_prize_won, Decimal('0.00'))
+        self.assertFalse(res_3.is_top3)
+
+    def test_dashboard_renders_provisional_podium_for_finalizing_gw(self):
+        """Dashboard renders provisional top 3 and finalizing status banner when status is 'finalizing'."""
+        calculate_gameweek_payouts(self.gw)
+        resp = self.client.get('/')
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Provisional")
+        self.assertContains(resp, "Finalizing Bonuses")
+
+

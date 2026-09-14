@@ -176,7 +176,7 @@ def get_active_gw_flagged_summary(target_gw_num=None, target_gw_number=None) -> 
             target_gw = None
 
     if not target_gw:
-        target_gw = Gameweek.objects.filter(status='active').first()
+        target_gw = Gameweek.objects.filter(status__in=['active', 'finalizing']).first()
     if not target_gw:
         target_gw = Gameweek.objects.filter(status='upcoming').order_by('number').first()
     if not target_gw:
@@ -186,7 +186,7 @@ def get_active_gw_flagged_summary(target_gw_num=None, target_gw_number=None) -> 
 
     # Start / Kickoff status for target GW (when first match starts)
     gw_start = target_gw.start_time
-    is_past_start = target_gw.is_past_start or target_gw.status in ['active', 'finished']
+    is_past_start = target_gw.is_past_start or target_gw.status in ['active', 'finalizing', 'finished']
     time_left_seconds = 0
     is_within_24h = False
     time_left_human = ""
@@ -221,7 +221,7 @@ def get_active_gw_flagged_summary(target_gw_num=None, target_gw_number=None) -> 
         38: "GW 38 Season Finale Waiver (No Fines)",
     }.get(target_gw.number, "")
 
-    if target_gw.status == 'active':
+    if target_gw.status in ['active', 'finalizing']:
         gw_state = 'active'
     elif is_past_start:
         gw_state = 'active' if target_gw.status != 'finished' else 'finished'
@@ -237,7 +237,7 @@ def get_active_gw_flagged_summary(target_gw_num=None, target_gw_number=None) -> 
     # =========================================================================
     past_gws = [
         gw for gw in all_gws
-        if (gw.is_past_start or gw.status in ['active', 'finished']) and gw.number != target_gw.number
+        if (gw.is_past_start or gw.status in ['active', 'finalizing', 'finished']) and gw.number != target_gw.number
     ]
 
     # If target_gw has itself started, include it in defaulters evaluation

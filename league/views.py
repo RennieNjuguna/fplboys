@@ -44,10 +44,13 @@ def dashboard_overview(request):
 
     gw_podium = []
     if selected_podium_gw:
-        gw_podium = selected_podium_gw.results.filter(is_top3=True).select_related('member').order_by('league_rank')
+        if selected_podium_gw.status == 'finished':
+            gw_podium = selected_podium_gw.results.filter(is_top3=True).select_related('member').order_by('league_rank')
+        else:
+            gw_podium = selected_podium_gw.results.select_related('member').order_by('league_rank', '-net_points')[:3]
 
     # Next upcoming/active gameweek
-    current_or_next_gw = Gameweek.objects.filter(status__in=['active', 'upcoming']).order_by('number').first()
+    current_or_next_gw = Gameweek.objects.filter(status__in=['active', 'finalizing', 'upcoming']).order_by('number').first()
 
     # Overall Standings with Rank Tracker Arrows
     members = list(Member.objects.filter(is_active=True))
@@ -114,7 +117,7 @@ def standings_view(request):
     selected_month = request.GET.get('month')
 
     all_gws = Gameweek.objects.all().order_by('number')
-    finished_gws = Gameweek.objects.filter(status__in=['finished', 'active']).order_by('number')
+    finished_gws = Gameweek.objects.filter(status__in=['finished', 'finalizing', 'active']).order_by('number')
 
     # Available months with names
     month_names = {
@@ -127,10 +130,12 @@ def standings_view(request):
 
     members = list(Member.objects.filter(is_active=True))
     standings_rows = []
+    selected_gw_obj = None
 
     if filter_type == 'gw' and selected_gw_num:
         try:
             target_gw = Gameweek.objects.get(number=int(selected_gw_num))
+            selected_gw_obj = target_gw
             results = target_gw.results.select_related('member').order_by('league_rank', '-net_points')
             for r in results:
                 standings_rows.append({
@@ -149,7 +154,7 @@ def standings_view(request):
 
     elif filter_type == 'month' and selected_month:
         month_int = int(selected_month)
-        month_gws = Gameweek.objects.filter(month=month_int, status__in=['finished', 'active'])
+        month_gws = Gameweek.objects.filter(month=month_int, status__in=['finished', 'finalizing', 'active'])
         for m in members:
             res_agg = GameweekResult.objects.filter(member=m, gameweek__in=month_gws).aggregate(
                 total_pts=Sum('net_points'),
@@ -172,7 +177,7 @@ def standings_view(request):
     else:
         # Default: Overall Standings with previous GW comparison
         filter_type = 'overall'
-        all_finished = list(Gameweek.objects.filter(status='finished').order_by('number'))
+        all_finished = list(Gameweek.objects.filter(status__in=['finished', 'finalizing']).order_by('number'))
         prev_totals = {}
         if len(all_finished) >= 2:
             prev_gws = all_finished[:-1]
@@ -187,7 +192,7 @@ def standings_view(request):
             prev_rank_map = {}
 
         for m in members:
-            res_agg = GameweekResult.objects.filter(member=m, gameweek__status__in=['finished', 'active']).aggregate(
+            res_agg = GameweekResult.objects.filter(member=m, gameweek__status__in=['finished', 'finalizing', 'active']).aggregate(
                 total_pts=Sum('net_points'),
                 total_gross=Sum('gw_points'),
                 total_hits=Sum('transfer_cost'),
@@ -212,6 +217,7 @@ def standings_view(request):
 
     context = {
         'filter_type': filter_type,
+        'selected_gw': selected_gw_obj,
         'selected_gw_num': int(selected_gw_num) if selected_gw_num else (finished_gws.first().number if finished_gws.exists() else 1),
         'selected_month': int(selected_month) if selected_month else 8,
         'all_gws': all_gws,
@@ -258,7 +264,7 @@ def manager_detail_view(request, member_id):
     # Gameweek performance data for Chart.js
     gws_with_results = list(Gameweek.objects.filter(results__isnull=False).distinct().order_by('number'))
     if not gws_with_results:
-        gws_with_results = list(Gameweek.objects.filter(status__in=['finished', 'active']).order_by('number'))
+        gws_with_results = list(Gameweek.objects.filter(status__in=['finished', 'finalizing', 'active']).order_by('number'))
 
     gw_labels = []
     manager_net_points = []
