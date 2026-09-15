@@ -18,8 +18,8 @@ def publish_gw4():
     ensure_news_tables_exist()
     gw = Gameweek.objects.get(number=4)
 
-    # 1. Update GameweekResult prize allocations factoring in Benn's & Chris's disqualifications
-    # Payouts: Samuel = 250.00, Bright = 166.67, Aron = 41.67, Marvin = 41.67, Benn = 0.00 (Disqualified)
+    # 1. Update GameweekResult prize allocations:
+    # Samuel: 250.00, Bright: 166.67, Aron: 41.67, Marvin: 41.67, Benn: 0.00 (Disqualified / Flagged)
     payout_map = {
         'Samuel': Decimal('250.00'),
         'Bright': Decimal('166.67'),
@@ -40,19 +40,19 @@ def publish_gw4():
         res.is_top3 = is_top3
         res.save(update_fields=['gw_prize_won', 'is_top3'])
 
-    # 2. Build Broadsheet Content with 100% accurate transfer and squad data
+    # 2. Build 100% Factual & Savage Broadsheet Content
     headline = "GW 4 MAYHEM: SAMUEL'S 90-PT SPREE, BRIGHT'S BENCH HEIST, BENN'S FORFEITED PODIUM CASH, & ERICK'S CLOWN COLLAPSE!"
-    subheadline = "Issue #4 Broadsheet: Pascal Groß tears the league apart, Benn loses Ksh. 83 and benches 14-pt Davis, Bruno captaincy delusions continue, and all 10 managers take 0 transfer hits."
+    subheadline = "Issue #4 Broadsheet: Pascal Groß runs riot in Brighton's 5-0 win, Benn forfeits Ksh. 83 while benching 14-pt Davis, Bruno Derby captaincy tears, and all 10 managers take zero hits."
     
     chief_editor = "The League Scribe & Chief Banter Autopsist"
-    weather_report = "Raining shillings on Samuel & Bright; freezing cold bankruptcy in the Defaulter Ward for Benn and King Chris."
+    weather_report = "Bright sunshine and incoming cash for Samuel & Bright; freezing cold bankruptcy in the Defaulter Ward for Benn and King Chris."
 
     editorial_lead = (
-        "Gameweek 4 exploded with astronomical scores, textbook transfer discipline, and ruthless financial drama across our 10-man battleground. "
-        "Reigning supreme at the pinnacle, Samuel Wambua ('maggry shiners fc') unleashed a 90-point hurricane powered by a monster 17-point haul from Pascal Groß and Erling Haaland's captaincy (18 pts) to claim 1st place and bank Ksh. 250.00! "
-        "Hot on his heels, Bright Ottore ('Phill Me In FC') scored an imperious 88 points to bag Ksh. 166.67—all while continuing his legendary ritual of stranding 12 points on his luxury bench! "
-        "However, the round's greatest financial tragedy belongs to Benn Mwangi: after scoring a brilliant 78 points on the pitch, his unpaid treasury dues meant his Ksh. 83.33 cash prize was forfeited and rolled down to Aron Mangati and Marvin Owino (Ksh. 41.67 each)! To compound his sorrow, Benn also left a 14-point Leif Davis haul on his bench. "
-        "Meanwhile, King Chris and Erick Muchira formed the 'Bruno Fernandes Captaincy Cult' for a combined 8 points from their armbands. "
+        "Gameweek 4 delivered astronomical scores, flawless transfer discipline, and ruthless financial drama across our 10-man battleground. "
+        "Reigning supreme at the summit, Samuel Wambua ('maggry shiners fc') unleashed a 90-point hurricane powered by a sensational 17-point haul from Pascal Groß (1 goal, 2 assists in Brighton's 5-0 rout of Coventry) and Erling Haaland's captaincy (18 pts) to claim 1st place and pocket Ksh. 250.00! "
+        "Hot on his heels, Bright Ottore ('Phill Me In FC') scored an imperious 88 points to bag Ksh. 166.67—all while continuing his sacred ritual of stranding 12 points on his luxury bench! "
+        "However, the round's greatest financial tragedy belongs to Benn Mwangi: after scoring a brilliant 78 points on the pitch, his unpaid treasury dues meant his Ksh. 83.33 cash prize was forfeited and rolled down to Aron Mangati and Marvin Owino (Ksh. 41.67 each)! To compound his misery, Benn also left a 14-point Leif Davis haul (goal & 2 assists for Ipswich) frozen on his bench. "
+        "Meanwhile, in the Manchester Derby (Man Utd 0-1 Man City), King Chris and Erick Muchira formed a delusional 'Bruno Fernandes Captaincy Cult' (4 pts) while watching Haaland score the derby winner. "
         "Erick's 'mambaaa' suffered a total blackout with a league-lowest 52 points, earning the undisputed GW 4 Wooden Spoon Clown Crown!"
     )
 
@@ -61,27 +61,27 @@ def publish_gw4():
 
     king = samuel
     king_reason = (
-        "Samuel 'maggry shiners fc' Wambua unleashed a 90-point tactical masterclass. "
+        "Samuel 'maggry shiners fc' Wambua orchestrated a 90-point masterclass. "
         "His Pascal Groß (17 pts) differential combined with captain Haaland (18 pts) and João Pedro (12 pts) conquered the league and banked the Ksh. 250.00 top prize!"
     )
 
     clown = erick
     clown_reason = (
-        "Erick 'mambaaa' Muchira crashed straight into the basement with an embarrassing 52 net points (11 points behind 9th place). "
-        "Captaining Bruno Fernandes for 4 points while leaving Murillo (6 pts) on the bench earned Erick the undisputed GW 4 Wooden Spoon Clown Hat!"
+        "Erick 'mambaaa' Muchira crashed straight into the basement with an embarrassing 52 net points (a massive 11 points behind 9th place). "
+        "Captaining Bruno Fernandes in a 0-1 derby loss while leaving Murillo (6 pts) on the bench earned Erick the undisputed GW 4 Wooden Spoon Clown Hat!"
     )
 
-    quote_of_the_week = "\"I thought Bruno against Southampton was a mathematical certainty. The only thing mathematically certain is my weekly fine.\" — King Chris"
-    quote_author = "King Chris (Treasury Defaulter & Armband Survivor)"
+    quote_of_the_week = "\"I was convinced Bruno would orchestrate the Manchester Derby. Instead, Haaland scored the winner, Bruno blanked, and the Treasurer fined me.\" — King Chris"
+    quote_author = "King Chris (Treasury Defaulter & Derby Survivor)"
 
     defaulter_roast = (
         "🚨 TREASURY WALL OF SHAME (GW 4): Benn Mwangi and King Chris have officially taken over the league sponsorship department! "
-        "Benn's failure to clear his Ksh. 150 dues cost him a whopping Ksh. 83.33 podium prize that was redistributed to Aron and Marvin. "
-        "Meanwhile, King Chris remains a permanent VIP resident of the fine ledger for the second week running. Sincere gratitude from the BBQ Pot Committee!"
+        "Benn's failure to clear his Ksh. 150 contribution cost him a Ksh. 83.33 podium prize that was redistributed to Aron and Marvin. "
+        "Meanwhile, King Chris remains a permanent VIP resident of the fine ledger for the second consecutive week. Sincere gratitude from the BBQ Pot Committee!"
     )
 
     transfer_hit_roast = (
-        "💥 THE TRANSFER MARKET REPORT: Flawless transfer discipline across the board! "
+        "💥 THE TRANSFER MARKET REPORT: Flawless transfer discipline across the entire mini-league! "
         "All 10 managers took ZERO transfer hits (-0 pts) in Gameweek 4. "
         "Four tacticians (Samuel, Benn, Aron, Marvin) rolled over their free transfers, while the other six made precise free swaps. "
         "The real financial bleeding this week wasn't from transfer hits—it was the forfeited prize money from our flagged defaulters!"
@@ -95,11 +95,11 @@ def publish_gw4():
         },
         {
             'title': 'LOST & FOUND: Leif Davis (14 Points)',
-            'desc': 'Found sitting frozen on Benn Mwangi’s bench alongside 15 total bench points. Please return to active starting XI.',
+            'desc': 'Found sitting frozen on Benn Mwangi’s bench alongside 15 total bench points after Ipswich’s 3-2 win. Please return to starting XI.',
             'contact': 'Drop off at Odysseus Subs Bench'
         },
         {
-            'title': 'WANTED: Bruno Fernandes Captaincy Rehab',
+            'title': 'WANTED: Bruno Derby Captaincy Rehab',
             'desc': 'Support group meeting every Tuesday for King Chris and Erick. Coffee, tissues, and Haaland apology forms provided.',
             'contact': 'Visit www.stopcaptainingbruno.com'
         },
@@ -143,7 +143,7 @@ def publish_gw4():
             'net_pts': 90,
             'badge': '👑 1ST PLACE (90-PT CHAMPION)',
             'title': "Samuel Wambua - 'maggry shiners' 90-Point Masterclass & Top Prize",
-            'body': "A footballing symphony of the highest order! Samuel rolled his transfer and tore the competition to shreds with a breathtaking 90 net points. His inspired Pascal Groß differential returned a monster 17 points, perfectly complemented by captain Haaland (18 pts), João Pedro (12 pts), and Joško Gvardiol (11 pts). Sits indisputably atop the podium with Ksh. 250.00 in cash!",
+            'body': "A footballing symphony of the highest order! Samuel rolled his transfer and tore the competition to shreds with a breathtaking 90 net points. His inspired Pascal Groß differential returned a monster 17 points (1 goal, 2 assists in Brighton's 5-0 thrashing of Coventry), perfectly complemented by captain Haaland (18 pts), João Pedro (12 pts), and Joško Gvardiol (11 pts). Sits indisputably atop the podium with Ksh. 250.00 in cash!",
             'verdict': "Verdict: Supreme 90-Point Baller & Cash King (Ksh. 250.00)",
         },
         # Rank 2: Bright Ottore
@@ -203,7 +203,7 @@ def publish_gw4():
             'net_pts': 67,
             'badge': '🧤 7TH PLACE (SCHADE & RAYA SHOW)',
             'title': "Marve Mathingu - 'Marve of the Match' Carried by Schade & Raya",
-            'body': "After the infamous Cherki Triple Captain saga in GW 3, Marve pivoted to sanity. Differential maestro Kevin Schade delivered a sensational 15 points, while David Raya pulled off a 14-point goalkeeping clinic. Unfortunately, with Saka captaincy returning 16 pts and the rest of his outfield sleeping, Marve settled for rank #7 with 67 points.",
+            'body': "After the infamous Cherki Triple Captain saga in GW 3, Marve pivoted to sanity. Differential maestro Kevin Schade delivered a sensational 15 points (2 goals in Brentford's 2-2 at Bournemouth), while David Raya pulled off a 14-point goalkeeping masterclass at Sunderland. Unfortunately, with Saka captaincy returning 16 pts and the rest of his outfield sleeping, Marve settled for rank #7 with 67 points.",
             'verdict': "Verdict: Goalkeeping Heroics in Mid-Table (67 pts)",
         },
         # Rank 8: Torque Dennis
@@ -222,8 +222,8 @@ def publish_gw4():
             'rank': 9,
             'net_pts': 63,
             'badge': '🤡 9TH PLACE (REPEAT DEFAULTER & BRUNO CULT)',
-            'title': "King Chris - The Painter's Triple Disaster: Bruno Armband, Rank 9 & BBQ Fine!",
-            'body': "A comedy of errors worthy of an Oscar! For the THIRD week in a row, King Chris blindly trusted Bruno Fernandes with the captain's armband for a microscopic 4 points (wasting Haaland's 18). Even Raya (14 pts), João Pedro (12 pts), and DCL (10 pts) couldn't save him from rank #9. To cap it all off, Chris was FLAGGED as an unpaid defaulter again!",
+            'title': "King Chris - The Painter's Derby Disaster: Bruno Armband, Rank 9 & BBQ Fine!",
+            'body': "A comedy of errors worthy of an Oscar! For the THIRD week in a row, King Chris blindly trusted Bruno Fernandes with the captain's armband for a microscopic 4 points in a 0-1 Manchester Derby defeat (wasting Haaland's 18 pts). Even Raya (14 pts), João Pedro (12 pts), and DCL (10 pts) couldn't save him from rank #9. To cap it all off, Chris was FLAGGED as an unpaid defaulter again!",
             'verdict': "Verdict: Honorary President of the Fine & Armband Disaster Club",
         },
         # Rank 10: Erick Muchira
@@ -233,7 +233,7 @@ def publish_gw4():
             'net_pts': 52,
             'badge': '🤡 10TH PLACE (WOODEN SPOON CLOWN)',
             'title': "Erick Muchira - 'mambaaa' Crashes by 11 Points for the Wooden Spoon!",
-            'body': "The undisputed catastrophe of Gameweek 4! Erick joined King Chris in the delusional Bruno Fernandes Captaincy Cult (4 pts), while Murillo (6 pts) mocked him from the bench. With 5 starting outfield players scoring 2 points or fewer, 'mambaaa' suffered a total blackout with 52 net points—finishing a whopping 11 points adrift of 9th place!",
+            'body': "The undisputed catastrophe of Gameweek 4! Erick joined King Chris in the delusional Bruno Fernandes Captaincy Cult (4 pts in the Manchester Derby), while Murillo (6 pts) mocked him from the bench. With 5 starting outfield players scoring 2 points or fewer, 'mambaaa' suffered a total blackout with 52 net points—finishing a whopping 11 points adrift of 9th place!",
             'verdict': "Verdict: Undisputed GW 4 Wooden Spoon Clown Crown Holder",
         },
     ]
