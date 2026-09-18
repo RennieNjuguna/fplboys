@@ -126,19 +126,22 @@ class FPLSyncService:
             else:
                 deadline_dt = timezone.now()
 
-            # Determine status based on official FPL flags
+            # Determine status based on official FPL flags & safety timeouts
             is_data_checked = event.get('data_checked', False)
             is_event_finished = event.get('finished', False)
             is_current = event.get('is_current', False)
             is_next = event.get('is_next', False)
+            fixtures_done = is_event_finished or self.check_gameweek_fixtures_finished(gw_num)
 
             if is_data_checked:
                 status = 'finished'
+            elif deadline_dt and timezone.now() >= deadline_dt + timezone.timedelta(hours=36) and fixtures_done:
+                status = 'finished'
+            elif deadline_dt and timezone.now() >= deadline_dt + timezone.timedelta(hours=60):
+                status = 'finished'
             elif timezone.now() >= deadline_dt:
-                if self.check_gameweek_fixtures_finished(gw_num) or is_event_finished:
+                if fixtures_done:
                     status = 'finalizing'
-                elif timezone.now() >= deadline_dt + timezone.timedelta(days=3, hours=12):
-                    status = 'finished'
                 else:
                     status = 'active'
             else:
@@ -280,18 +283,23 @@ class FPLSyncService:
             ev_info = event_dict.get(gw.number, {})
             is_data_checked = ev_info.get('data_checked', False)
             is_event_finished = ev_info.get('finished', False)
+            fixtures_done = is_event_finished or self.check_gameweek_fixtures_finished(gw.number)
 
             if is_data_checked:
                 if gw.status != 'finished':
                     gw.status = 'finished'
                     gw.save(update_fields=['status'])
-            elif gw.status in ['active', 'finalizing']:
-                if self.check_gameweek_fixtures_finished(gw.number) or is_event_finished:
-                    if gw.status != 'finalizing':
-                        gw.status = 'finalizing'
-                        gw.save(update_fields=['status'])
-                elif gw.deadline_time and timezone.now() >= gw.deadline_time + timezone.timedelta(days=3, hours=12):
+            elif gw.deadline_time and timezone.now() >= gw.deadline_time + timezone.timedelta(hours=36) and fixtures_done:
+                if gw.status != 'finished':
                     gw.status = 'finished'
+                    gw.save(update_fields=['status'])
+            elif gw.deadline_time and timezone.now() >= gw.deadline_time + timezone.timedelta(hours=60):
+                if gw.status != 'finished':
+                    gw.status = 'finished'
+                    gw.save(update_fields=['status'])
+            elif gw.status in ['active', 'finalizing'] and fixtures_done:
+                if gw.status != 'finalizing':
+                    gw.status = 'finalizing'
                     gw.save(update_fields=['status'])
 
             calculate_gameweek_payouts(gw)
