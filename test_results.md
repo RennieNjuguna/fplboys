@@ -2,8 +2,8 @@
 
 **Date**: September 18, 2026  
 **Environment**: Python 3.7.9 / Django 3.2.18 / Windows  
-**Test Suite**: 	reasury.tests_comprehensive_payout.ComprehensivePayoutAndAllocationTests  
-**Overall Suite**: 56 Total Tests (10 Comprehensive Scenarios + 46 Regression Tests)  
+**Test Suite**: `treasury.tests_comprehensive_payout.ComprehensivePayoutAndAllocationTests`  
+**Overall Suite**: 57 Total Tests (11 Comprehensive Scenarios + 46 Regression Tests)  
 **Final Status**: **100% PASSED (0 Failures, 0 Errors)**
 
 ---
@@ -33,6 +33,7 @@ To permanently eliminate accounting discrepancies, ghost deductions, and install
 | 7 | **Financial Ledger Matrix Consistency** | **PASS** | Matrix sum of column totals equals sum of row totals down to the cent across mixed states (paid, partial, late, waived, pardoned, prize-funded). |
 | 8 | **Pot Calculator Exactness with Partial Payments** | **PASS** | 150 payment + 75 partial payment = 225 total revenue. Pots split evenly: 75 BBQ, 75 Jackpot, 75 Prize Pool. Sum equals 225.00 exactly. |
 | 9 | **Direct Gameweek Payment Deletion** | **PASS** | Deleting a Payment record directly from the portal cleans up parent allocations and linked reinvested prize payouts, restoring prize winnings. |
+| 10 | **Marvin Owino Partial Prize & Cash Deletion Flow** | **PASS** | GW3 prize (83.33) + M-Pesa cash 67.00 ('UICBQ5X8CK') funds GW4 (150). Deleting the cash transaction does **NOT** delete the gameweek payment and does **NOT** erase the prize; GW4 retains 83.33 and reverts to 'PRIZE-WINNINGS'. Re-entering cash completes GW4 to 150. Deleting the prize transaction retains the cash (66.67) and restores 83.33 to available prize balance. Deleting the full payment also restores the 83.33 prize immediately. |
 
 ---
 

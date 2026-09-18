@@ -31,6 +31,7 @@ class ComprehensivePayoutAndAllocationTests(TestCase):
         self.gw2 = Gameweek.objects.create(number=2, name='Gameweek 2', deadline_time=self.past + timedelta(days=1), status='finished')
         self.gw3 = Gameweek.objects.create(number=3, name='Gameweek 3', deadline_time=self.past + timedelta(days=2), status='finished')
         self.gw4 = Gameweek.objects.create(number=4, name='Gameweek 4', deadline_time=self.past + timedelta(days=3), status='finished')
+        self.gw5 = Gameweek.objects.create(number=5, name='Gameweek 5', deadline_time=self.past + timedelta(days=4), status='upcoming')
 
     def test_scenario_1_user_wins_and_rolls_over_winnings(self):
         # Sam wins 166.67 in GW1
@@ -338,3 +339,116 @@ class ComprehensivePayoutAndAllocationTests(TestCase):
             summary['bbq_standard_portion'] + summary['total_jackpot_pot'] + summary['total_prize_pool_collected'],
             Decimal('225.00')
         )
+
+    def test_scenario_10_marvin_owino_prize_and_cash_deletion_flow(self):
+        """
+        Tests the exact Marvin Owino workflow:
+        1. Manager wins GW3 (Ksh. 83.33).
+        2. Applies Ksh. 83.33 prize to GW4 contribution.
+           GW4 Payment is created with amount_paid = 83.33, status PARTIAL.
+        3. Manager pays Ksh. 67.00 cash via M-Pesa ('UICBQ5X8CK').
+           GW4 Payment increases to 150.00 (PAID), and 0.33 carries over to GW5.
+           Payment mpesa_code becomes 'PRIZE / UICBQ5X8CK'.
+        4. Treasurer deletes the M-Pesa cash transaction (Tx 'UICBQ5X8CK').
+           VERIFICATION:
+           - GW4 Payment is NOT deleted!
+           - GW4 Payment retains Ksh. 83.33 (the prize portion).
+           - GW4 mpesa_code cleanly reverts to 'PRIZE-WINNINGS'.
+           - GW5 carryover (0.33) is cleanly reversed.
+           - Available prize balance remains 0.00 (83.33 is still actively allocated in GW4).
+        5. Treasurer re-enters Ksh. 67.00 cash ('UICBQ5X8CK').
+           - GW4 Payment is once again 150.00 (PAID).
+           - Payment mpesa_code is 'PRIZE / UICBQ5X8CK'.
+        6. Treasurer deletes the PRIZE rollover transaction instead of cash:
+           - GW4 Payment is NOT wiped out!
+           - GW4 Payment retains Ksh. 66.67 (the cash portion).
+           - Payment mpesa_code reverts to 'UICBQ5X8CK'.
+           - Manager's available prize balance is IMMEDIATELY RESTORED to Ksh. 83.33!
+        7. If Treasurer deletes the entire Gameweek Payment:
+           - The 83.33 prize is restored to available prize balance.
+        """
+        m = Member.objects.create(fpl_entry_id=901, manager_name='Marvin Owino', team_name='Don Bosco')
+
+        # 1. Marvin wins GW3 (83.33)
+        GameweekResult.objects.create(
+            member=m, gameweek=self.gw3, gw_points=70, net_points=70,
+            gw_prize_won=Decimal('83.33'), is_top3=True, league_rank=3
+        )
+        self.assertEqual(get_member_available_prize_balance(m), Decimal('83.33'))
+
+        # 2. Allocate 83.33 prize to GW4
+        created_prize = apply_winnings_to_future_gameweeks(
+            member=m, amount_to_apply=Decimal('83.33'), start_gw_number=4,
+            timestamp=self.gw4.deadline_time - timedelta(hours=5)
+        )
+        self.assertEqual(len(created_prize), 1)
+        p_gw4 = Payment.objects.get(member=m, gameweek=self.gw4)
+        self.assertEqual(p_gw4.amount_paid, Decimal('83.33'))
+        self.assertEqual(p_gw4.mpesa_code, 'PRIZE-WINNINGS')
+        self.assertEqual(get_member_available_prize_balance(m), Decimal('0.00'))
+
+        tx_prize = PaymentTransaction.objects.get(member=m, transaction_type='PRIZE_ROLLOVER')
+
+        # 3. Marvin pays Ksh. 67.00 cash via M-Pesa ('UICBQ5X8CK')
+        created_cash = allocate_payment_with_rollover(
+            member=m, start_gw=self.gw4, total_amount=Decimal('67.00'),
+            mpesa_code='UICBQ5X8CK', timestamp=self.gw4.deadline_time - timedelta(hours=1)
+        )
+        p_gw4.refresh_from_db()
+        self.assertEqual(p_gw4.amount_paid, Decimal('150.00'))
+        self.assertIn('PRIZE', p_gw4.mpesa_code)
+        self.assertIn('UICBQ5X8CK', p_gw4.mpesa_code)
+
+        tx_cash = PaymentTransaction.objects.get(member=m, mpesa_code='UICBQ5X8CK')
+        self.assertEqual(tx_cash.amount, Decimal('67.00'))
+        # 66.67 to GW4, 0.33 to GW5
+        self.assertEqual(tx_cash.allocation_records.count(), 2)
+
+        # 4. Treasurer deletes the cash transaction 'UICBQ5X8CK'
+        delete_payment_transaction(tx_cash)
+
+        # Verify GW4 payment is NOT deleted and retains 83.33 prize!
+        p_gw4.refresh_from_db()
+        self.assertEqual(p_gw4.amount_paid, Decimal('83.33'))
+        self.assertEqual(p_gw4.mpesa_code, 'PRIZE-WINNINGS')
+        self.assertEqual(p_gw4.transaction, tx_prize)
+        self.assertEqual(Payment.objects.filter(member=m, gameweek__number=5).count(), 0)
+        self.assertEqual(get_member_available_prize_balance(m), Decimal('0.00'))
+
+        # 5. Treasurer re-enters Ksh. 67.00 cash
+        created_cash_2 = allocate_payment_with_rollover(
+            member=m, start_gw=self.gw4, total_amount=Decimal('67.00'),
+            mpesa_code='UICBQ5X8CK', timestamp=self.gw4.deadline_time - timedelta(hours=1)
+        )
+        p_gw4.refresh_from_db()
+        self.assertEqual(p_gw4.amount_paid, Decimal('150.00'))
+        self.assertIn('PRIZE', p_gw4.mpesa_code)
+        self.assertIn('UICBQ5X8CK', p_gw4.mpesa_code)
+
+        tx_cash_2 = PaymentTransaction.objects.get(member=m, mpesa_code='UICBQ5X8CK')
+
+        # 6. Treasurer deletes the PRIZE transaction instead of cash
+        delete_payment_transaction(tx_prize)
+
+        p_gw4.refresh_from_db()
+        self.assertEqual(p_gw4.amount_paid, Decimal('66.67'))
+        self.assertEqual(p_gw4.mpesa_code, 'UICBQ5X8CK')
+        self.assertEqual(p_gw4.transaction, tx_cash_2)
+        # Prize is immediately restored to available balance!
+        self.assertEqual(get_member_available_prize_balance(m), Decimal('83.33'))
+
+        # 7. Re-apply prize and then delete the entire GW4 payment
+        apply_winnings_to_future_gameweeks(
+            member=m, amount_to_apply=Decimal('83.33'), start_gw_number=4,
+            timestamp=self.gw4.deadline_time - timedelta(hours=1)
+        )
+        self.assertEqual(get_member_available_prize_balance(m), Decimal('0.00'))
+
+        p_gw4.refresh_from_db()
+        self.assertEqual(p_gw4.amount_paid, Decimal('150.00'))
+
+        # Delete the whole payment
+        delete_gameweek_payment(p_gw4)
+        self.assertEqual(Payment.objects.filter(member=m, gameweek=self.gw4).count(), 0)
+        # Prize is once again restored!
+        self.assertEqual(get_member_available_prize_balance(m), Decimal('83.33'))

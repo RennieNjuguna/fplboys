@@ -322,8 +322,25 @@ def delete_payment_transaction(tx: PaymentTransaction):
             if p.amount_paid <= Decimal('0.00') and not has_active_fine:
                 p.delete()
             else:
-                remaining_alloc = p.allocation_records.exclude(transaction=tx).first()
-                p.transaction = remaining_alloc.transaction if remaining_alloc else None
+                remaining_allocs = p.allocation_records.exclude(transaction=tx).select_related('transaction')
+                if remaining_allocs.exists():
+                    p.transaction = remaining_allocs.first().transaction
+                    codes = []
+                    for r_alloc in remaining_allocs:
+                        r_tx = r_alloc.transaction
+                        if r_tx:
+                            if r_tx.transaction_type == 'PRIZE_ROLLOVER':
+                                if 'PRIZE' not in codes and 'PRIZE-WINNINGS' not in codes:
+                                    codes.append('PRIZE')
+                            elif r_tx.mpesa_code and r_tx.mpesa_code not in codes:
+                                codes.append(r_tx.mpesa_code)
+                    if codes:
+                        if len(codes) == 1 and codes[0] == 'PRIZE':
+                            p.mpesa_code = 'PRIZE-WINNINGS'
+                        else:
+                            p.mpesa_code = ' / '.join(codes)
+                else:
+                    p.transaction = None
                 p.save()
 
         tx.delete()
