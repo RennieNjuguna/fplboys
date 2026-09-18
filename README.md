@@ -135,11 +135,71 @@ powershell -Command "cd C:\WorkArea\fpl_boyz; python manage.py sync_fpl"
 
 ---
 
+## 🔄 Production Database Replacement & Deployment Guide
+
+To safely replace the SQLite database on the live cPanel / VPS production server:
+
+### Step 1: Backup Existing Live Database on Server
+Before making any changes on the production server, create a timestamped backup of the current database:
+```bash
+cp db.sqlite3 db_backup_$(date +%Y%m%d_%H%M%S).sqlite3
+```
+
+### Step 2: Pull Latest Code from Git
+Pull the newly committed codebase containing the restructured payout engine, models, and migrations:
+```bash
+git pull origin main
+```
+
+### Step 3: Replace the SQLite Database
+Upload the reconciled `db.sqlite3` (or `db (1).sqlite3`) from this repository to the application root directory on the server, replacing `db.sqlite3`.
+> **Note**: Both `db.sqlite3` and `db (1).sqlite3` in this repository are identical, fully migrated (`0001` through `0008`), and verified down to the cent.
+
+### Step 4: Run Django Migrations on the Server
+Ensure all migrations are marked as applied in Django's migration registry:
+```bash
+python manage.py migrate
+```
+
+### Step 5: Reload / Restart Application
+On cPanel (Phusion Passenger / LiteSpeed):
+```bash
+touch passenger_wsgi.py
+```
+Or restart the Python application directly from cPanel's **"Setup Python App"** interface.
+
+---
+
+## 💎 Advanced Treasury Allocation & Payout Engine
+
+The application features a transaction-level accounting engine designed for multi-installment payments and prize rollovers:
+
+1. **Explicit Transaction Allocation (`TransactionAllocation`)**:
+   - Payments are backed by parent `PaymentTransaction` records (e.g. M-Pesa receipts or prize conversions).
+   - Multiple transactions can fund a single gameweek contribution (e.g. Ksh. 83.33 prize + Ksh. 66.67 cash = Ksh. 150.00 standard cap).
+2. **Self-Healing Prize Rollovers**:
+   - Available prize balances are dynamically derived from active allocations.
+   - Deleting a cash payment transaction never wipes out prize winnings or the gameweek payment.
+   - Deleting a prize-funded payment immediately and reversibly restores the winnings to the manager's available prize balance.
+3. **Reversible Multi-Step Installment Deletions**:
+   - Deleting one transaction from a multi-installment payment cleanly reduces only that transaction's share, leaving other installments intact.
+   - Fine settlements and partial contributions are cleanly rolled back in layers.
+4. **Late Payment Disqualification & Roll-Down**:
+   - Unpaid or late-paying managers cannot win podium prizes.
+   - Eligible prize awards cleanly roll down to the next qualified managers (e.g. GW4 Benn Mwangi late disqualification rolled down to Aron Mangati and Marvin Owino).
+
+---
+
 ## 🧪 Running Automated Tests
 
-Run the full test suite covering tie-breaker payout algorithms, late fine allocations, pot math, and matrix generators:
+Run the complete 57-test suite covering tie-breaker payout algorithms, late fine allocations, pot math, transaction allocation, and reversible multi-step deletions:
 ```bash
 python manage.py test
+```
+All 57 tests pass with 0 failures and 0 errors:
+```
+Ran 57 tests in 6.051s
+OK
 ```
 
 ---
