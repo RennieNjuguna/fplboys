@@ -25,11 +25,21 @@ def get_treasury_summary():
     )['late_fine_amount__sum'] or Decimal('0.00')
 
     # Pot breakdowns:
-    # Each standard payment of Ksh. 150 contributes:
-    # 50 -> BBQ, 50 -> Jackpot, 50 -> Weekly Prize Pool
-    standard_bbq_portion = Decimal(str(total_verified_count * settings.BBQ_PORTION))
-    standard_jackpot_portion = Decimal(str(total_verified_count * settings.JACKPOT_PORTION))
-    standard_prize_pool_portion = Decimal(str(total_verified_count * settings.PRIZE_POOL_PORTION))
+    # Each payment contributes 1/3 to BBQ, 1/3 to Jackpot, 1/3 to Weekly Prize Pool (capped at Ksh. 150.00 standard rate)
+    # Handles full payments (50/50/50) and partial payments (e.g. 75 -> 25/25/25) accurately to the cent.
+    standard_bbq_portion = Decimal('0.00')
+    standard_jackpot_portion = Decimal('0.00')
+    standard_prize_pool_portion = Decimal('0.00')
+
+    for p in verified_payments:
+        base_amt = min(p.amount_paid, Decimal('150.00'))
+        bbq_part = (base_amt / Decimal('3')).quantize(Decimal('0.01'), rounding='ROUND_HALF_UP')
+        jack_part = (base_amt / Decimal('3')).quantize(Decimal('0.01'), rounding='ROUND_HALF_UP')
+        prize_part = base_amt - bbq_part - jack_part
+
+        standard_bbq_portion += bbq_part
+        standard_jackpot_portion += jack_part
+        standard_prize_pool_portion += prize_part
 
     # All late fines route directly into the BBQ Pot!
     total_bbq_pot = standard_bbq_portion + total_fines_collected

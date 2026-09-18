@@ -21,7 +21,9 @@ from treasury.services.payment_allocation import (
     apply_winnings_to_future_gameweeks,
     get_member_available_prize_balance,
     record_cash_payout,
-    allocate_payment_with_rollover
+    allocate_payment_with_rollover,
+    delete_payment_transaction,
+    delete_gameweek_payment
 )
 
 
@@ -307,6 +309,8 @@ def treasurer_portal_view(request):
     except Exception:
         pass
 
+    finalizing_gws = Gameweek.objects.filter(status='finalizing').order_by('number')
+
     context = {
         'form': form,
         'all_transactions': all_transactions,
@@ -317,6 +321,7 @@ def treasurer_portal_view(request):
         'members_winnings_list': members_winnings_list,
         'all_gws': all_gws,
         'gazette_editions': gazette_editions,
+        'finalizing_gws': finalizing_gws,
     }
     return render(request, 'treasury/portal.html', context)
 
@@ -396,7 +401,7 @@ def payment_edit_view(request, payment_id):
 @treasury_admin_required
 def payment_delete_view(request, payment_id):
     """
-    Delete a Payment record.
+    Safely and reversibly delete a Payment record using the allocation engine.
     """
     payment = get_object_or_404(Payment, pk=payment_id)
     member_name = payment.member.manager_name
@@ -404,7 +409,7 @@ def payment_delete_view(request, payment_id):
     amount = payment.amount_paid
 
     if request.method == 'POST':
-        payment.delete()
+        delete_gameweek_payment(payment)
         AuditLog.objects.create(
             action='PAYMENT_DELETED',
             description=f"Deleted payment ID #{payment_id} for {member_name} (GW {gw_num}, Ksh. {amount}).",
@@ -422,7 +427,7 @@ def payment_delete_view(request, payment_id):
 @treasury_admin_required
 def transaction_delete_view(request, transaction_id):
     """
-    Delete a PaymentTransaction and all its associated per-GW allocations.
+    Safely and reversibly delete a PaymentTransaction and cleanly decrement its allocations.
     """
     tx = get_object_or_404(PaymentTransaction, pk=transaction_id)
     member_name = tx.member.manager_name
@@ -430,19 +435,40 @@ def transaction_delete_view(request, transaction_id):
     ref = tx.mpesa_code
 
     if request.method == 'POST':
-        tx.delete()
+        delete_payment_transaction(tx)
         AuditLog.objects.create(
             action='PAYMENT_DELETED',
-            description=f"Deleted M-Pesa transaction ID #{transaction_id} for {member_name} (Ksh. {amount}, Ref: {ref}) and all its GW allocations.",
+            description=f"Deleted transaction ID #{transaction_id} for {member_name} (Ksh. {amount}, Ref: {ref}) and its allocations.",
             performed_by='Treasurer'
         )
-        messages.success(request, f"🗑️ Deleted M-Pesa transaction of Ksh. {amount:,.2f} for {member_name} (Ref: {ref or 'N/A'}).")
+        messages.success(request, f"🗑️ Deleted transaction of Ksh. {amount:,.2f} for {member_name} (Ref: {ref or 'N/A'}).")
         return redirect('treasurer_portal')
 
     context = {
         'transaction': tx,
     }
     return render(request, 'treasury/transaction_confirm_delete.html', context)
+
+
+@treasury_admin_required
+def finalize_gameweek_view(request, gw_number):
+    """
+    Manually finalizes a gameweek that is in 'finalizing' state,
+    marking it finished and executing payout calculations.
+    """
+    gw = get_object_or_404(Gameweek, number=gw_number)
+    if request.method == 'POST':
+        from league.services.payout_engine import calculate_gameweek_payouts
+        gw.status = 'finished'
+        gw.save(update_fields=['status'])
+        calculate_gameweek_payouts(gw)
+        AuditLog.objects.create(
+            action='PAYOUT_CALCULATED',
+            description=f"Gameweek {gw.number} manually finalized and prize payouts calculated by Treasurer.",
+            performed_by='Treasurer'
+        )
+        messages.success(request, f"🏆 Gameweek {gw.number} has been finalized and payouts calculated successfully!")
+    return redirect('treasurer_portal')
 
 
 @treasury_admin_required

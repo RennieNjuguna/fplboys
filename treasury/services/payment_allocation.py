@@ -3,7 +3,14 @@ from django.db import transaction
 from django.db.models import Sum
 from django.utils import timezone
 from league.models import Member, Gameweek
-from treasury.models import Payment, AuditLog, PrizePayout, PaymentTransaction, WAIVED_FINE_GAMEWEEKS
+from treasury.models import (
+    Payment,
+    AuditLog,
+    PrizePayout,
+    PaymentTransaction,
+    TransactionAllocation,
+    WAIVED_FINE_GAMEWEEKS
+)
 
 
 def models_sum(field_name):
@@ -13,7 +20,9 @@ def models_sum(field_name):
 def get_member_available_prize_balance(member: Member) -> Decimal:
     """
     Computes a member's available prize winnings that haven't yet been disbursed or converted to payments.
-    Available = Total Prizes Won - Cash Disbursed (M-Pesa) - Reinvested in Payments.
+    Available = Total Prizes Won (finished GWs) - Cash Disbursed (M-Pesa) - Active Reinvested in Payments.
+    Self-healing: Active reinvestments are derived from active TransactionAllocation records so deleting
+    or editing payments instantly and reversibly restores prize winnings without ghost deductions.
     """
     total_won = member.total_prizes_won
 
@@ -22,20 +31,23 @@ def get_member_available_prize_balance(member: Member) -> Decimal:
         payout_method='MPESA_CASH'
     ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
 
-    reinvested_payouts = PrizePayout.objects.filter(
-        member=member,
-        payout_method='REINVESTED'
+    # Active reinvested allocations tied to active verified payments
+    active_prize_allocations = TransactionAllocation.objects.filter(
+        transaction__member=member,
+        transaction__transaction_type='PRIZE_ROLLOVER',
+        payment__verified=True
     ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
 
-    # Fallback for any legacy prize payments that lack PrizePayout records
-    legacy_reinvested = Payment.objects.filter(
-        member=member,
-        mpesa_code__icontains="PRIZE",
-        verified=True
-    ).aggregate(total=Sum('amount_paid'))['total'] or Decimal('0.00')
+    if active_prize_allocations == Decimal('0.00'):
+        # Fallback for any legacy prize payments that lack TransactionAllocation records
+        legacy_reinvested = Payment.objects.filter(
+            member=member,
+            mpesa_code__icontains="PRIZE",
+            verified=True
+        ).aggregate(total=Sum('amount_paid'))['total'] or Decimal('0.00')
+        active_prize_allocations = legacy_reinvested
 
-    total_reinvested = max(reinvested_payouts, legacy_reinvested)
-    available = total_won - cash_disbursed - total_reinvested
+    available = total_won - cash_disbursed - active_prize_allocations
     return max(Decimal('0.00'), available)
 
 
@@ -81,10 +93,10 @@ def allocate_payment_with_rollover(
     Unified payment and prize rollover allocation engine:
     1. Records the parent PaymentTransaction capturing the exact incoming payment amount (e.g. Ksh. 400).
     2. Distributes funds starting at start_gw in increments up to standard Ksh. 150.00 per GW using FIFO.
-    3. Correctly adds to existing partial payments (e.g. 83.33 + 66.67 = 150.00) without overwriting.
+    3. Correctly adds to existing partial payments (e.g. 75 + 75 = 150.00) without overwriting.
     4. Automatically cascades any excess funds (> 150.00 or balance excess) forward to subsequent unpaid/partially paid GWs.
     5. Guarantees no single GW payment exceeds Ksh. 150.00 standard contribution.
-    6. Links all per-GW allocation records to the parent PaymentTransaction.
+    6. Records explicit TransactionAllocation records linking each transaction portion to the target payment.
     """
     if timestamp is None:
         timestamp = timezone.now()
@@ -129,6 +141,12 @@ def allocate_payment_with_rollover(
             if remaining_balance >= fine_due:
                 fine_p.fine_paid = True
                 fine_p.save(update_fields=['fine_paid'])
+                TransactionAllocation.objects.create(
+                    transaction=transaction_obj,
+                    payment=fine_p,
+                    amount=fine_due,
+                    allocation_type='LATE_FINE'
+                )
                 remaining_balance -= fine_due
                 if fine_p not in created_payments:
                     created_payments.append(fine_p)
@@ -141,13 +159,18 @@ def allocate_payment_with_rollover(
             existing_payment = Payment.objects.filter(member=member, gameweek=gw).first()
             current_paid = existing_payment.amount_paid if existing_payment else Decimal('0.00')
 
-            standard_rate = Decimal('150.00')
             if current_paid >= standard_rate:
                 if existing_payment and existing_payment.is_late and not existing_payment.fine_paid:
                     fine_due = existing_payment.late_fine_amount or Decimal('50.00')
                     if remaining_balance >= fine_due:
                         existing_payment.fine_paid = True
                         existing_payment.save(update_fields=['fine_paid'])
+                        TransactionAllocation.objects.create(
+                            transaction=transaction_obj,
+                            payment=existing_payment,
+                            amount=fine_due,
+                            allocation_type='LATE_FINE'
+                        )
                         remaining_balance -= fine_due
                         if existing_payment not in created_payments:
                             created_payments.append(existing_payment)
@@ -174,7 +197,8 @@ def allocate_payment_with_rollover(
                 if timestamp:
                     existing_payment.timestamp_received = timestamp
 
-                existing_payment.transaction = transaction_obj
+                if not existing_payment.transaction:
+                    existing_payment.transaction = transaction_obj
 
                 if is_prize:
                     if not existing_payment.mpesa_code:
@@ -196,6 +220,13 @@ def allocate_payment_with_rollover(
 
                 existing_payment.verified = verified
                 existing_payment.save()
+
+                TransactionAllocation.objects.create(
+                    transaction=transaction_obj,
+                    payment=existing_payment,
+                    amount=allocating,
+                    allocation_type='CONTRIBUTION'
+                )
                 created_payments.append(existing_payment)
             else:
                 if is_prize:
@@ -216,12 +247,19 @@ def allocate_payment_with_rollover(
                     verified=verified,
                     notes=custom_notes
                 )
+                TransactionAllocation.objects.create(
+                    transaction=transaction_obj,
+                    payment=new_payment,
+                    amount=allocating,
+                    allocation_type='CONTRIBUTION'
+                )
                 created_payments.append(new_payment)
 
             if is_prize:
                 PrizePayout.objects.create(
                     member=member,
                     gameweek=gw,
+                    transaction=transaction_obj,
                     amount=allocating,
                     payout_method='REINVESTED',
                     notes=f"Reinvested prize into GW {gw.number} contribution",
@@ -239,6 +277,93 @@ def allocate_payment_with_rollover(
         )
 
     return created_payments
+
+
+def delete_payment_transaction(tx: PaymentTransaction):
+    """
+    Safely and reversibly deletes a PaymentTransaction:
+    1. Removes linked PrizePayout records if it was a PRIZE_ROLLOVER, restoring available prize balance.
+    2. Groups linked allocations by payment and cleanly deducts contributions and reverses fine settlements.
+    3. Deletes tx itself.
+    """
+    with transaction.atomic():
+        # Clean up any PrizePayout records tied to this transaction
+        PrizePayout.objects.filter(transaction=tx).delete()
+        if tx.transaction_type == 'PRIZE_ROLLOVER':
+            for alloc in tx.allocation_records.all():
+                PrizePayout.objects.filter(
+                    member=tx.member,
+                    gameweek=alloc.payment.gameweek,
+                    payout_method='REINVESTED'
+                ).delete()
+
+        # Group allocations by payment to avoid in-memory ORM field overwrites
+        payment_allocs = {}
+        for alloc in tx.allocation_records.select_related('payment').all():
+            payment_allocs.setdefault(alloc.payment, []).append(alloc)
+
+        for p, alloc_list in payment_allocs.items():
+            contrib_deduct = Decimal('0.00')
+            fine_reverted = False
+
+            for alloc in alloc_list:
+                if alloc.allocation_type == 'LATE_FINE':
+                    fine_reverted = True
+                else:
+                    contrib_deduct += alloc.amount
+                alloc.delete()
+
+            if fine_reverted:
+                p.fine_paid = False
+
+            p.amount_paid = max(Decimal('0.00'), p.amount_paid - contrib_deduct)
+
+            has_active_fine = bool(p.is_late and p.late_fine_amount > Decimal('0.00') and p.fine_paid)
+            if p.amount_paid <= Decimal('0.00') and not has_active_fine:
+                p.delete()
+            else:
+                remaining_alloc = p.allocation_records.exclude(transaction=tx).first()
+                p.transaction = remaining_alloc.transaction if remaining_alloc else None
+                p.save()
+
+        tx.delete()
+
+
+def delete_gameweek_payment(payment: Payment):
+    """
+    Safely and reversibly deletes a specific Gameweek Payment:
+    1. Removes linked PrizePayout(REINVESTED) records for this member and gameweek.
+    2. Removes linked TransactionAllocation records.
+    3. Updates parent PaymentTransactions: if a transaction has no other allocations, removes it,
+       or reduces its amount.
+    4. Deletes payment itself.
+    """
+    with transaction.atomic():
+        member = payment.member
+        gw = payment.gameweek
+
+        # Remove reinvested prize payout for this gameweek if any
+        PrizePayout.objects.filter(
+            member=member,
+            gameweek=gw,
+            payout_method='REINVESTED'
+        ).delete()
+
+        transactions_to_check = set()
+        for alloc in payment.allocation_records.select_related('transaction').all():
+            transactions_to_check.add(alloc.transaction)
+            alloc.delete()
+
+        payment.delete()
+
+        for tx in transactions_to_check:
+            remaining_count = tx.allocation_records.count()
+            if remaining_count == 0:
+                tx.delete()
+            else:
+                new_amount = tx.allocation_records.aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+                tx.amount = new_amount
+                tx.save(update_fields=['amount'])
 
 
 def process_bulk_payment_carryover(member: Member, start_gw: Gameweek, total_amount: Decimal, timestamp=None, mpesa_code=None, notes=None) -> list:
@@ -259,7 +384,7 @@ def process_bulk_payment_carryover(member: Member, start_gw: Gameweek, total_amo
     )
 
 
-def apply_winnings_to_future_gameweeks(member: Member, amount_to_apply: Decimal, start_gw_number=None) -> list:
+def apply_winnings_to_future_gameweeks(member: Member, amount_to_apply: Decimal, start_gw_number=None, timestamp=None) -> list:
     """
     Applies a manager's cash prize winnings to cater for future unpaid gameweeks.
     Marks contributions with 'PRIZE-WINNINGS' and tracks reinvestments in PrizePayout.
@@ -285,6 +410,7 @@ def apply_winnings_to_future_gameweeks(member: Member, amount_to_apply: Decimal,
         member=member,
         start_gw=start_gw,
         total_amount=amount_to_apply,
+        timestamp=timestamp,
         verified=True,
         is_prize=True
     )

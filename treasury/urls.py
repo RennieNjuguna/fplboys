@@ -10,5 +10,6 @@ urlpatterns = [
     path('payment/<int:payment_id>/delete/', views.payment_delete_view, name='payment_delete'),
     path('transaction/<int:transaction_id>/delete/', views.transaction_delete_view, name='transaction_delete'),
     path('payout/<int:payout_id>/delete/', views.payout_delete_view, name='payout_delete'),
+    path('gameweek/<int:gw_number>/finalize/', views.finalize_gameweek_view, name='finalize_gameweek'),
     path('api/check-deadline/', views.api_check_deadline, name='api_check_deadline'),
 ]

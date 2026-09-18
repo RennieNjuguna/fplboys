@@ -37,8 +37,32 @@
             <a href="{% url 'treasury_lock' %}" class="inline-flex items-center px-3.5 py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs font-bold rounded-xl border border-gray-700 transition-colors">
                 <i data-lucide="lock" class="w-3.5 h-3.5 mr-1.5"></i> Lock
             </a>
-        </div>
     </div>
+    </div>
+
+    {% if finalizing_gws %}
+    <div class="space-y-3">
+        {% for gw in finalizing_gws %}
+        <div class="bg-gradient-to-r from-amber-950/60 to-gray-900 border border-amber-500/50 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center flex-shrink-0">
+                    <i data-lucide="clock" class="w-5 h-5 text-amber-400"></i>
+                </div>
+                <div>
+                    <h3 class="text-sm font-bold text-amber-200">Gameweek {{ gw.number }} is Finalizing Bonuses</h3>
+                    <p class="text-xs text-amber-300/80 mt-0.5">Points are being finalized. You can manually finalize and calculate prize payouts now if matches have concluded.</p>
+                </div>
+            </div>
+            <form method="POST" action="{% url 'finalize_gameweek' gw.number %}">
+                {% csrf_token %}
+                <button type="submit" class="px-4 py-2 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-gray-950 font-black text-xs uppercase tracking-wider rounded-xl shadow transition-all flex items-center whitespace-nowrap">
+                    <i data-lucide="award" class="w-4 h-4 mr-1.5"></i> Finalize GW {{ gw.number }} & Settle Payouts
+                </button>
+            </form>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
 
     <!-- 2 Column Layout: Fast Form on Left, Transactions Management on Right -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -317,6 +341,9 @@
                                 </td>
                                 <td class="px-4 py-3 text-center font-mono font-bold text-emerald-400">
                                     Ksh. {{ p.amount_paid|floatformat:0 }}
+                                    {% if p.allocation_records.count > 1 or p.amount_paid < 150 %}
+                                    <span class="text-[9px] text-cyan-300 font-sans block font-normal mt-0.5">{{ p.funding_breakdown }}</span>
+                                    {% endif %}
                                 </td>
                                 <td class="px-4 py-3 text-center">
                                     {% if p.is_late %}

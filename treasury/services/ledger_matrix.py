@@ -24,6 +24,7 @@ def build_financial_ledger_matrix(max_gws=38):
             'gw': gw,
             'total_collected': Decimal('0.00'),
             'total_fines': Decimal('0.00'),
+            'total_due': Decimal('0.00'),
             'total_prizes': Decimal('0.00'),
             'paid_count': 0,
             'late_count': 0,
@@ -64,7 +65,9 @@ def build_financial_ledger_matrix(max_gws=38):
                 if is_late_payment and late_fine == Decimal('0.00'):
                     late_fine = Decimal('50.00')
 
-                balance_due = max(Decimal('0.00'), standard_due - amount_paid)
+                unpaid_contrib = max(Decimal('0.00'), standard_due - amount_paid)
+                unpaid_fine = late_fine if (is_late_payment and not payment.fine_paid) else Decimal('0.00')
+                balance_due = unpaid_contrib + unpaid_fine
                 
                 if amount_paid >= standard_due:
                     if is_late_payment:
@@ -102,6 +105,7 @@ def build_financial_ledger_matrix(max_gws=38):
                 else:
                     status = 'UPCOMING'
 
+            col_totals[gw.id]['total_due'] += balance_due
             row_total_prizes += prize_won
             col_totals[gw.id]['total_prizes'] += prize_won
 
@@ -122,6 +126,7 @@ def build_financial_ledger_matrix(max_gws=38):
                 'timestamp': payment.timestamp_received if payment else None,
                 'is_due': is_due,
                 'is_waived': gw.number in WAIVED_FINE_GAMEWEEKS,
+                'funding_breakdown': payment.funding_breakdown if payment else None,
             }
             row_cells.append(cell)
 
@@ -132,7 +137,7 @@ def build_financial_ledger_matrix(max_gws=38):
             'cells': row_cells,
             'total_paid': row_total_paid,
             'total_fines': row_total_fines,
-            'total_due': row_total_due if 'row_total_due' in locals() else (Decimal('150.00') * row_unpaid_count),
+            'total_due': sum(c['balance_due'] for c in row_cells),
             'total_prizes': row_total_prizes,
             'net_pl': net_pl,
             'unpaid_count': row_unpaid_count,
@@ -142,6 +147,7 @@ def build_financial_ledger_matrix(max_gws=38):
     column_summaries = [col_totals[gw.id] for gw in gameweeks]
     grand_total_collected = sum(c['total_collected'] for c in column_summaries)
     grand_total_fines = sum(c['total_fines'] for c in column_summaries)
+    grand_total_due = sum(c['total_due'] for c in column_summaries)
     grand_total_prizes = sum(c['total_prizes'] for c in column_summaries)
 
     return {
@@ -151,6 +157,7 @@ def build_financial_ledger_matrix(max_gws=38):
         'column_summaries': column_summaries,
         'grand_total_collected': grand_total_collected,
         'grand_total_fines': grand_total_fines,
+        'grand_total_due': grand_total_due,
         'grand_total_prizes': grand_total_prizes,
     }
 

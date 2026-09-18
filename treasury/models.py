@@ -92,6 +92,9 @@ class PaymentTransaction(models.Model):
     @property
     def allocations_summary_text(self):
         """Returns a clean summary string like: GW 1 (150) • GW 2 (150) • GW 3 (100)"""
+        records = list(self.allocation_records.select_related('payment__gameweek').order_by('payment__gameweek__number'))
+        if records:
+            return " • ".join([f"GW {r.payment.gameweek.number} (Ksh. {r.amount:,.0f})" for r in records])
         allocs = list(self.allocations_list)
         if not allocs:
             gw_num = self.starting_gameweek.number if self.starting_gameweek else 1
@@ -108,7 +111,7 @@ class Payment(models.Model):
     """
     transaction = models.ForeignKey(
         PaymentTransaction,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name='allocations',
@@ -198,6 +201,23 @@ class Payment(models.Model):
         """True if the member has paid the contribution in full and cleared any late fines"""
         return self.amount_paid >= Decimal('150.00') and (not self.is_late or self.fine_paid)
 
+    @property
+    def funding_breakdown(self) -> str:
+        """
+        Returns a human-readable breakdown of funding sources for this payment.
+        e.g. 'Ksh. 75.00 (Cash) + Ksh. 75.00 (Prize)' or 'Ksh. 150.00 (Cash)'
+        """
+        records = list(self.allocation_records.select_related('transaction').all())
+        if not records:
+            if "PRIZE" in (self.mpesa_code or ""):
+                return f"Ksh. {self.amount_paid:,.2f} (Prize)"
+            return f"Ksh. {self.amount_paid:,.2f} (Cash)"
+        parts = []
+        for r in records:
+            tx_type = "Prize" if r.transaction.transaction_type == 'PRIZE_ROLLOVER' else "Cash"
+            parts.append(f"Ksh. {r.amount:,.2f} ({tx_type})")
+        return " + ".join(parts)
+
     def save(self, *args, **kwargs):
         # Auto-compute late status (waiver for GW1, GW2, GW19, GW38)
         if self.gameweek and self.gameweek.number in WAIVED_FINE_GAMEWEEKS:
@@ -217,6 +237,52 @@ class Payment(models.Model):
         super().save(*args, **kwargs)
 
 
+class TransactionAllocation(models.Model):
+    """
+    Detailed ledger linking a PaymentTransaction to a specific Gameweek Payment.
+    Tracks how much of each transaction went into which Gameweek payment.
+    Enables multiple transactions to fund a single Gameweek (e.g. 75 cash + 75 prize,
+    or two 75 cash installments) and allows deleting one transaction without deleting
+    the other or corrupting the payment.
+    """
+    transaction = models.ForeignKey(
+        PaymentTransaction,
+        on_delete=models.CASCADE,
+        related_name='allocation_records',
+        help_text="Parent payment transaction"
+    )
+    payment = models.ForeignKey(
+        Payment,
+        on_delete=models.CASCADE,
+        related_name='allocation_records',
+        help_text="Target Gameweek payment record"
+    )
+    ALLOCATION_TYPE_CHOICES = (
+        ('CONTRIBUTION', 'Gameweek Contribution'),
+        ('LATE_FINE', 'Late Fine Settlement'),
+    )
+
+    amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        help_text="Amount allocated from this transaction to this payment in Ksh."
+    )
+    allocation_type = models.CharField(
+        max_length=20,
+        choices=ALLOCATION_TYPE_CHOICES,
+        default='CONTRIBUTION',
+        help_text="Whether this allocation covers the base GW contribution or a late fine"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at']
+        verbose_name = "Transaction Allocation"
+        verbose_name_plural = "Transaction Allocations"
+
+    def __str__(self):
+        return f"Tx #{self.transaction_id} -> GW {self.payment.gameweek.number} (Ksh. {self.amount})"
+
 
 class PrizePayout(models.Model):
     """
@@ -229,6 +295,14 @@ class PrizePayout(models.Model):
     )
     member = models.ForeignKey(Member, on_delete=models.CASCADE, related_name='prize_payouts')
     gameweek = models.ForeignKey(Gameweek, on_delete=models.SET_NULL, null=True, blank=True, related_name='prize_payouts')
+    transaction = models.ForeignKey(
+        PaymentTransaction,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='prize_payouts',
+        help_text="Parent transaction if this payout was reinvested"
+    )
     amount = models.DecimalField(max_digits=10, decimal_places=2, help_text="Amount disbursed in Ksh.")
     payout_method = models.CharField(max_length=20, choices=PAYOUT_METHOD_CHOICES, default='MPESA_CASH')
     mpesa_reference = models.CharField(max_length=50, blank=True, null=True, help_text="Outgoing M-Pesa Transaction Ref (e.g. QLK983021LK)")
