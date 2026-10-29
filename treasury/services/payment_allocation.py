@@ -134,7 +134,7 @@ def allocate_payment_with_rollover(
             member=member,
             is_late=True,
             fine_paid=False
-        ).order_by('gameweek__number')
+        ).exclude(gameweek__number__in=WAIVED_FINE_GAMEWEEKS).order_by('gameweek__number')
 
         for fine_p in unpaid_fine_payments:
             fine_due = fine_p.late_fine_amount or Decimal('50.00')
@@ -147,6 +147,16 @@ def allocate_payment_with_rollover(
                     amount=fine_due,
                     allocation_type='LATE_FINE'
                 )
+                if is_prize:
+                    PrizePayout.objects.create(
+                        member=member,
+                        gameweek=fine_p.gameweek,
+                        transaction=transaction_obj,
+                        amount=fine_due,
+                        payout_method='REINVESTED',
+                        notes=f"Reinvested prize into GW {fine_p.gameweek.number} late fine",
+                        disbursed_at=timestamp
+                    )
                 remaining_balance -= fine_due
                 if fine_p not in created_payments:
                     created_payments.append(fine_p)
@@ -160,7 +170,7 @@ def allocate_payment_with_rollover(
             current_paid = existing_payment.amount_paid if existing_payment else Decimal('0.00')
 
             if current_paid >= standard_rate:
-                if existing_payment and existing_payment.is_late and not existing_payment.fine_paid:
+                if existing_payment and existing_payment.is_late and not existing_payment.fine_paid and gw.number not in WAIVED_FINE_GAMEWEEKS:
                     fine_due = existing_payment.late_fine_amount or Decimal('50.00')
                     if remaining_balance >= fine_due:
                         existing_payment.fine_paid = True
@@ -171,6 +181,16 @@ def allocate_payment_with_rollover(
                             amount=fine_due,
                             allocation_type='LATE_FINE'
                         )
+                        if is_prize:
+                            PrizePayout.objects.create(
+                                member=member,
+                                gameweek=gw,
+                                transaction=transaction_obj,
+                                amount=fine_due,
+                                payout_method='REINVESTED',
+                                notes=f"Reinvested prize into GW {gw.number} late fine",
+                                disbursed_at=timestamp
+                            )
                         remaining_balance -= fine_due
                         if existing_payment not in created_payments:
                             created_payments.append(existing_payment)
@@ -189,6 +209,7 @@ def allocate_payment_with_rollover(
 
             is_first = (gw == first_allocated_gw)
 
+            target_payment = None
             if existing_payment:
                 existing_payment.amount_paid += allocating
                 if existing_payment.amount_paid > standard_rate:
@@ -227,6 +248,7 @@ def allocate_payment_with_rollover(
                     amount=allocating,
                     allocation_type='CONTRIBUTION'
                 )
+                target_payment = existing_payment
                 created_payments.append(existing_payment)
             else:
                 if is_prize:
@@ -253,6 +275,7 @@ def allocate_payment_with_rollover(
                     amount=allocating,
                     allocation_type='CONTRIBUTION'
                 )
+                target_payment = new_payment
                 created_payments.append(new_payment)
 
             if is_prize:
@@ -267,6 +290,30 @@ def allocate_payment_with_rollover(
                 )
 
             remaining_balance -= allocating
+
+            # Settle late fine on this gameweek if applicable BEFORE rolling over to next gameweek!
+            if target_payment and target_payment.is_late and not target_payment.fine_paid and gw.number not in WAIVED_FINE_GAMEWEEKS:
+                fine_due = target_payment.late_fine_amount or Decimal('50.00')
+                if remaining_balance >= fine_due:
+                    target_payment.fine_paid = True
+                    target_payment.save(update_fields=['fine_paid'])
+                    TransactionAllocation.objects.create(
+                        transaction=transaction_obj,
+                        payment=target_payment,
+                        amount=fine_due,
+                        allocation_type='LATE_FINE'
+                    )
+                    if is_prize:
+                        PrizePayout.objects.create(
+                            member=member,
+                            gameweek=gw,
+                            transaction=transaction_obj,
+                            amount=fine_due,
+                            payout_method='REINVESTED',
+                            notes=f"Reinvested prize into GW {gw.number} late fine",
+                            disbursed_at=timestamp
+                        )
+                    remaining_balance -= fine_due
 
         source_desc = "prize winnings" if is_prize else f"payment of Ksh. {total_amount}"
         start_gw_num = first_allocated_gw.number if first_allocated_gw else (candidate_gws[0].number if candidate_gws else 1)
@@ -431,3 +478,126 @@ def apply_winnings_to_future_gameweeks(member: Member, amount_to_apply: Decimal,
         verified=True,
         is_prize=True
     )
+
+
+def audit_and_fix_neglected_fines(member: Member = None) -> list:
+    """
+    Audits members for neglected late fines:
+    A gameweek payment where is_late=True and not fine_paid (non-waived),
+    while the member has contribution funds allocated to future/advance gameweeks.
+
+    Rebalances by transferring the required fine amount (typically Ksh. 50.00)
+    from the member's furthest advance contribution allocation back to settle
+    the neglected late fine.
+
+    Returns a list of dicts describing each repair performed.
+    """
+    repairs = []
+    payments_qs = Payment.objects.filter(
+        is_late=True,
+        fine_paid=False
+    ).exclude(gameweek__number__in=WAIVED_FINE_GAMEWEEKS).order_by('member_id', 'gameweek__number')
+
+    if member:
+        payments_qs = payments_qs.filter(member=member)
+
+    with transaction.atomic():
+        for late_p in payments_qs:
+            fine_needed = late_p.late_fine_amount or Decimal('50.00')
+            if fine_needed <= Decimal('0.00'):
+                continue
+
+            # Look for contribution allocations on gameweeks ahead of this late payment
+            advance_allocs = list(
+                TransactionAllocation.objects.filter(
+                    payment__member=late_p.member,
+                    payment__gameweek__number__gt=late_p.gameweek.number,
+                    allocation_type='CONTRIBUTION',
+                    amount__gt=Decimal('0.00')
+                ).select_related('payment__gameweek', 'transaction').order_by(
+                    '-payment__gameweek__number', '-id'
+                )
+            )
+
+            if not advance_allocs:
+                continue
+
+            # Prioritize allocations belonging to the same transaction as late_p (if linked)
+            if late_p.transaction_id:
+                advance_allocs.sort(
+                    key=lambda a: (a.transaction_id == late_p.transaction_id, a.payment.gameweek.number),
+                    reverse=True
+                )
+
+            remaining_needed = fine_needed
+            for alloc in advance_allocs:
+                if remaining_needed <= Decimal('0.00'):
+                    break
+
+                deduct_amt = min(remaining_needed, alloc.amount)
+                donor_payment = alloc.payment
+                donor_gw_num = donor_payment.gameweek.number
+                donor_tx = alloc.transaction
+
+                # Deduct from advance allocation
+                alloc.amount -= deduct_amt
+                if alloc.amount <= Decimal('0.00'):
+                    alloc.delete()
+                else:
+                    alloc.save(update_fields=['amount'])
+
+                # Deduct from donor gameweek payment
+                donor_payment.amount_paid -= deduct_amt
+                if donor_payment.amount_paid <= Decimal('0.00') and not donor_payment.allocation_records.exists() and not donor_payment.is_late:
+                    donor_payment.delete()
+                else:
+                    donor_payment.save(update_fields=['amount_paid'])
+
+                # If donor transaction was a PRIZE_ROLLOVER, adjust PrizePayout
+                if donor_tx and donor_tx.transaction_type == 'PRIZE_ROLLOVER':
+                    payout = PrizePayout.objects.filter(
+                        transaction=donor_tx,
+                        gameweek=donor_payment.gameweek,
+                        payout_method='REINVESTED'
+                    ).first()
+                    if payout:
+                        if payout.amount > deduct_amt:
+                            payout.amount -= deduct_amt
+                            payout.save(update_fields=['amount'])
+                        else:
+                            payout.delete()
+
+                # Create LATE_FINE allocation on the late payment
+                TransactionAllocation.objects.create(
+                    transaction=donor_tx,
+                    payment=late_p,
+                    amount=deduct_amt,
+                    allocation_type='LATE_FINE'
+                )
+
+                if donor_tx and donor_tx.transaction_type == 'PRIZE_ROLLOVER':
+                    PrizePayout.objects.create(
+                        member=late_p.member,
+                        gameweek=late_p.gameweek,
+                        transaction=donor_tx,
+                        amount=deduct_amt,
+                        payout_method='REINVESTED',
+                        notes=f"Reinvested prize into GW {late_p.gameweek.number} late fine",
+                        disbursed_at=late_p.timestamp_received
+                    )
+
+                remaining_needed -= deduct_amt
+                repairs.append({
+                    'member': late_p.member.manager_name,
+                    'late_gw': late_p.gameweek.number,
+                    'donor_gw': donor_gw_num,
+                    'amount': deduct_amt,
+                    'tx_id': donor_tx.id if donor_tx else None
+                })
+
+            if remaining_needed <= Decimal('0.00'):
+                late_p.fine_paid = True
+                late_p.save(update_fields=['fine_paid'])
+
+    return repairs
+

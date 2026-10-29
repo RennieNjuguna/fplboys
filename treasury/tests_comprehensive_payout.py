@@ -11,7 +11,8 @@ from treasury.services.payment_allocation import (
     get_member_available_prize_balance,
     delete_payment_transaction,
     delete_gameweek_payment,
-    record_cash_payout
+    record_cash_payout,
+    audit_and_fix_neglected_fines
 )
 from treasury.services.pot_calculator import get_treasury_summary
 from treasury.services.ledger_matrix import build_financial_ledger_matrix
@@ -451,4 +452,181 @@ class ComprehensivePayoutAndAllocationTests(TestCase):
         delete_gameweek_payment(p_gw4)
         self.assertEqual(Payment.objects.filter(member=m, gameweek=self.gw4).count(), 0)
         # Prize is once again restored!
-        self.assertEqual(get_member_available_prize_balance(m), Decimal('83.33'))
+        self.assertEqual(get_member_available_prize_balance(m), Decimal('83.33'))
+
+
+    def test_scenario_11_lump_sum_across_multiple_late_gameweeks_settles_all_fines_before_advance(self):
+        """
+        Tests that when a member makes a lump sum payment covering multiple gameweeks where
+        multiple previous gameweeks incurred late fines (e.g. GW3 and GW4 both late),
+        ALL late fines are strictly settled before any excess money rolls over into advance gameweeks.
+        """
+        pay_time = self.gw4.start_time + timedelta(hours=2)
+
+        # Member Dennis Torque (m4) pays Ksh. 550 lump sum starting at GW3:
+        # GW3 (late): 150 contribution + 50 fine = 200
+        # GW4 (late): 150 contribution + 50 fine = 200
+        # GW5 (upcoming): 150 contribution advance = 150
+        # Total = 550
+        allocate_payment_with_rollover(
+            member=self.m4,
+            start_gw=self.gw3,
+            total_amount=Decimal('550.00'),
+            timestamp=pay_time,
+            mpesa_code='LUMPSUM_550',
+            notes='Lump sum for GW3-GW5'
+        )
+
+        p_gw3 = Payment.objects.get(member=self.m4, gameweek=self.gw3)
+        p_gw4 = Payment.objects.get(member=self.m4, gameweek=self.gw4)
+        p_gw5 = Payment.objects.get(member=self.m4, gameweek=self.gw5)
+
+        # Verify GW3: Fully cleared with late fine settled
+        self.assertEqual(p_gw3.amount_paid, Decimal('150.00'))
+        self.assertTrue(p_gw3.is_late)
+        self.assertTrue(p_gw3.fine_paid)
+        self.assertEqual(p_gw3.balance_due, Decimal('0.00'))
+        self.assertTrue(p_gw3.is_fully_cleared)
+
+        # Verify GW4: Fully cleared with late fine settled (NEVER neglected!)
+        self.assertEqual(p_gw4.amount_paid, Decimal('150.00'))
+        self.assertTrue(p_gw4.is_late)
+        self.assertTrue(p_gw4.fine_paid)
+        self.assertEqual(p_gw4.balance_due, Decimal('0.00'))
+        self.assertTrue(p_gw4.is_fully_cleared)
+
+        # Verify GW5: Advance payment of 150
+        self.assertEqual(p_gw5.amount_paid, Decimal('150.00'))
+        self.assertFalse(p_gw5.is_late)
+        self.assertFalse(p_gw5.is_fine_due)
+        self.assertTrue(p_gw5.is_fully_cleared)
+
+        # Verify exact allocation records for the transaction
+        tx = PaymentTransaction.objects.get(mpesa_code='LUMPSUM_550')
+        allocs = tx.allocation_records.order_by('payment__gameweek__number', 'allocation_type')
+        self.assertEqual(allocs.count(), 5)
+        self.assertEqual(
+            [(a.payment.gameweek.number, a.allocation_type, a.amount) for a in allocs],
+            [
+                (3, 'CONTRIBUTION', Decimal('150.00')),
+                (3, 'LATE_FINE', Decimal('50.00')),
+                (4, 'CONTRIBUTION', Decimal('150.00')),
+                (4, 'LATE_FINE', Decimal('50.00')),
+                (5, 'CONTRIBUTION', Decimal('150.00')),
+            ]
+        )
+
+    def test_scenario_12_single_gw_late_exact_payment_covers_fine_and_does_not_rollover(self):
+        """
+        Tests that when a member pays Ksh. 200 for a late gameweek, exactly 150 is allocated
+        to contribution and 50 to late fine, with 0 rolling over to future gameweeks.
+        """
+        pay_time = self.gw3.start_time + timedelta(hours=1)
+        allocate_payment_with_rollover(
+            member=self.m4,
+            start_gw=self.gw3,
+            total_amount=Decimal('200.00'),
+            timestamp=pay_time,
+            mpesa_code='EXACT_200'
+        )
+
+        p_gw3 = Payment.objects.get(member=self.m4, gameweek=self.gw3)
+        self.assertEqual(p_gw3.amount_paid, Decimal('150.00'))
+        self.assertTrue(p_gw3.is_late)
+        self.assertTrue(p_gw3.fine_paid)
+        self.assertEqual(p_gw3.balance_due, Decimal('0.00'))
+
+        # GW4 should not have any payment
+        self.assertFalse(Payment.objects.filter(member=self.m4, gameweek=self.gw4).exists())
+
+    def test_scenario_13_audit_and_fix_neglected_fines_rebalances_advance_funds(self):
+        """
+        Simulates the legacy bug (e.g. Marve Mathingu) where a lump sum paid GW3 late fine,
+        GW3 contribution, GW4 contribution, but skipped GW4 late fine and rolled forward into GW5 advance.
+        Tests that audit_and_fix_neglected_fines detects GW4's unpaid fine and rebalances 50.00
+        from the furthest advance allocation (GW5) back to GW4 late fine.
+        """
+        tx = PaymentTransaction.objects.create(
+            member=self.m4,
+            amount=Decimal('500.00'),
+            mpesa_code='BUGGY_LEGACY_TX',
+            transaction_type='MPESA'
+        )
+
+        # GW3: 150 contribution + 50 fine (paid)
+        p_gw3 = Payment.objects.create(
+            transaction=tx,
+            member=self.m4,
+            gameweek=self.gw3,
+            amount_paid=Decimal('150.00'),
+            timestamp_received=self.gw3.start_time + timedelta(hours=1),
+            is_late=True,
+            late_fine_amount=Decimal('50.00'),
+            fine_paid=True
+        )
+        TransactionAllocation.objects.create(transaction=tx, payment=p_gw3, amount=Decimal('50.00'), allocation_type='LATE_FINE')
+        TransactionAllocation.objects.create(transaction=tx, payment=p_gw3, amount=Decimal('150.00'), allocation_type='CONTRIBUTION')
+
+        # GW4: 150 contribution, BUT fine was neglected (is_late=True, fine_paid=False)
+        p_gw4 = Payment.objects.create(
+            transaction=tx,
+            member=self.m4,
+            gameweek=self.gw4,
+            amount_paid=Decimal('150.00'),
+            timestamp_received=self.gw4.start_time + timedelta(hours=1),
+            is_late=True,
+            late_fine_amount=Decimal('50.00'),
+            fine_paid=False
+        )
+        TransactionAllocation.objects.create(transaction=tx, payment=p_gw4, amount=Decimal('150.00'), allocation_type='CONTRIBUTION')
+
+        # GW5: 150 advance contribution
+        p_gw5 = Payment.objects.create(
+            transaction=tx,
+            member=self.m4,
+            gameweek=self.gw5,
+            amount_paid=Decimal('150.00'),
+            timestamp_received=self.gw4.start_time + timedelta(hours=1),
+            is_late=False,
+            fine_paid=True
+        )
+        TransactionAllocation.objects.create(transaction=tx, payment=p_gw5, amount=Decimal('150.00'), allocation_type='CONTRIBUTION')
+
+        self.assertFalse(p_gw4.fine_paid)
+        self.assertEqual(p_gw5.amount_paid, Decimal('150.00'))
+
+        # Run audit and fix
+        repairs = audit_and_fix_neglected_fines(member=self.m4)
+        self.assertEqual(len(repairs), 1)
+        self.assertEqual(repairs[0]['late_gw'], 4)
+        self.assertEqual(repairs[0]['donor_gw'], 5)
+        self.assertEqual(repairs[0]['amount'], Decimal('50.00'))
+
+        # Verify GW4 fine is now marked paid
+        p_gw4.refresh_from_db()
+        self.assertTrue(p_gw4.fine_paid)
+        self.assertTrue(p_gw4.is_fully_cleared)
+
+        # Verify GW5 advance was reduced from 150 to 100
+        p_gw5.refresh_from_db()
+        self.assertEqual(p_gw5.amount_paid, Decimal('100.00'))
+
+        # Verify new LATE_FINE allocation on GW4
+        gw4_fine_alloc = TransactionAllocation.objects.filter(payment=p_gw4, allocation_type='LATE_FINE').first()
+        self.assertIsNotNone(gw4_fine_alloc)
+        self.assertEqual(gw4_fine_alloc.amount, Decimal('50.00'))
+
+        # Verify running again does nothing (idempotent)
+        repairs_again = audit_and_fix_neglected_fines(member=self.m4)
+        self.assertEqual(len(repairs_again), 0)
+
+    def test_scenario_14_management_command_fix_neglected_fines(self):
+        """
+        Tests the manage.py fix_neglected_fines command.
+        """
+        from io import StringIO
+        from django.core.management import call_command
+
+        out = StringIO()
+        call_command('fix_neglected_fines', stdout=out)
+        self.assertIn("All late fines are properly settled", out.getvalue())
